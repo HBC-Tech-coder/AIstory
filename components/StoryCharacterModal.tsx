@@ -21,6 +21,13 @@ import {
   withCharacterIdentity,
   type NameCandidate,
 } from "@/lib/character-names";
+import {
+  CHARACTER_PORTRAIT_ALLOWED_MIME_TYPES,
+  isSafeStoredCharacterPortrait,
+  processCharacterReferencePhoto,
+  writeCharacterRolesToStorage,
+  type StorageWriteResult,
+} from "@/lib/clientCharacterPortrait";
 
 export type StoryCharacterModalRole = {
   id: string;
@@ -40,14 +47,6 @@ export type StoryCharacterModalRole = {
 const CUSTOM_ROLE_STORAGE_KEY = "aistory:play-roles";
 const SELECTED_ROLE_STORAGE_KEY = "aistory:selected-play-role";
 const ACTIVE_ROLE_STORAGE_KEY = "aistory:active-play-role";
-
-const DEFAULT_CUSTOM_VOICE_PROFILE = matchVoiceProfile({
-  role: "自定义玩家角色",
-  voiceDescription: "女性，清亮自然",
-  gender: "female",
-  ageRange: "young",
-  style: "bright",
-});
 
 const VOICE_GENDER_OPTIONS: Array<{ value: "male" | "female"; label: string }> = [
   { value: "female", label: "女性角色" },
@@ -80,6 +79,7 @@ type CharacterForm = {
   voiceAgeRange: CharacterVoiceProfile["ageRange"];
   voiceStyle: Exclude<CharacterVoiceProfile["style"], "narrator">;
   narratorVoice: boolean;
+  portraitUrl?: string;
 };
 
 const DEFAULT_FORM: CharacterForm = {
@@ -92,6 +92,7 @@ const DEFAULT_FORM: CharacterForm = {
   voiceAgeRange: "young",
   voiceStyle: "bright",
   narratorVoice: false,
+  portraitUrl: undefined,
 };
 
 function readCustomRoles(): StoryCharacterModalRole[] {
@@ -105,24 +106,38 @@ function readCustomRoles(): StoryCharacterModalRole[] {
       typeof role.name === "string" &&
       typeof role.role === "string" &&
       typeof role.description === "string"
-    ));
+    )).map((role) => ({
+      ...role,
+      portraitUrl: isSafeStoredCharacterPortrait(role.portraitUrl)
+        ? role.portraitUrl
+        : undefined,
+    }));
   } catch {
     return [];
   }
 }
 
-function writeCustomRoles(roles: StoryCharacterModalRole[]): void {
-  try {
-    window.localStorage.setItem(CUSTOM_ROLE_STORAGE_KEY, JSON.stringify(roles));
-  } catch {
-    /* ignore quota / private-mode failures */
-  }
+function writeCustomRoles(roles: StoryCharacterModalRole[]): StorageWriteResult {
+  return writeCharacterRolesToStorage(
+    window.localStorage,
+    CUSTOM_ROLE_STORAGE_KEY,
+    roles,
+  );
 }
 
 function saveSelectedRole(role: StoryCharacterModalRole): void {
+  const roleWithoutLocalPortrait = role.portraitUrl
+    ? { ...role, portraitUrl: undefined }
+    : role;
   try {
-    window.localStorage.setItem(SELECTED_ROLE_STORAGE_KEY, JSON.stringify(role));
-    window.sessionStorage.setItem(ACTIVE_ROLE_STORAGE_KEY, JSON.stringify(role));
+    window.localStorage.setItem(
+      SELECTED_ROLE_STORAGE_KEY,
+      JSON.stringify(roleWithoutLocalPortrait),
+    );
+    window.sessionStorage.setItem(
+      ACTIVE_ROLE_STORAGE_KEY,
+      JSON.stringify(roleWithoutLocalPortrait),
+    );
   } catch {
     /* ignore quota / private-mode failures */
   }
@@ -150,6 +165,17 @@ function roleVoiceProfile(role: StoryCharacterModalRole): CharacterVoiceProfile 
     description: role.description,
     voiceDescription: role.voice,
   });
+}
+
+export function characterGenderLabel(
+  voiceProfile: CharacterVoiceProfile,
+): "男性" | "女性" | "旁白" | "中性" {
+  if (voiceProfile.narrator === true || voiceProfile.style === "narrator") {
+    return "旁白";
+  }
+  if (voiceProfile.gender === "male") return "男性";
+  if (voiceProfile.gender === "female") return "女性";
+  return "中性";
 }
 
 function roleFromProfile(profile: VisibleCharacterProfile): StoryCharacterModalRole {
@@ -207,6 +233,9 @@ function RoleCard({
           </p>
           <h3 className="mt-2 text-xl font-semibold text-clay-900">{role.name}</h3>
           <p className="mt-1 text-sm text-clay-500">{role.role}</p>
+          <p className="mt-2 text-xs font-semibold text-clay-700">
+            角色性别：{characterGenderLabel(voiceProfile)}
+          </p>
           <p className="mt-2 text-xs text-amber-800">{voiceProfile.label}</p>
         </div>
         <span className="flex h-10 w-10 shrink-0 items-center justify-center border border-clay-900/12 text-amber-800 transition-colors group-hover:border-amber-700/55">
@@ -495,6 +524,7 @@ function StoryProfileCard({
             />
           </div>
           <div className="mt-4 grid gap-2 text-xs text-clay-500 md:grid-cols-2">
+            <span>角色性别：{characterGenderLabel(voiceProfile)}</span>
             {profile.relationshipToPlayer && <span>关系：{profile.relationshipToPlayer}</span>}
             {profile.emotion && <span>情绪：{profile.emotion}</span>}
             {profile.outfit && <span>造型：{profile.outfit}</span>}
@@ -529,6 +559,107 @@ function StoryProfileCard({
   );
 }
 
+function CharacterReferencePhotoField({
+  value,
+  onChange,
+  onError,
+}: {
+  value?: string;
+  onChange: (value: string | undefined) => void;
+  onError: (message: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [summary, setSummary] = useState("");
+
+  const handleFile = async (file?: File) => {
+    if (!file) return;
+    setBusy(true);
+    setSummary("");
+    onError("");
+    try {
+      const result = await processCharacterReferencePhoto(file);
+      onChange(result.dataUrl);
+      setSummary(
+        `已在浏览器内压缩为 ${result.width}×${result.height}，约 ${Math.ceil(result.bytes / 1024)} KB。`,
+      );
+    } catch (error) {
+      onError(
+        error instanceof Error
+          ? error.message
+          : "照片读取失败，请换一张图片重试。",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="border border-clay-900/12 bg-cream-100/35 p-4">
+      <div className="grid gap-4 sm:grid-cols-[120px_minmax(0,1fr)]">
+        <div className="aspect-[3/4] overflow-hidden border border-clay-900/12 bg-cream-50">
+          {value ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={value}
+              alt="本机参考照片预览"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center px-3 text-center text-clay-500">
+              <i className="fa-regular fa-image text-2xl" aria-hidden="true" />
+              <span className="mt-2 text-xs">尚未导入</span>
+            </div>
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-clay-800">
+            导入参考照片（本机）
+          </p>
+          <p className="mt-2 text-xs leading-5 text-clay-500">
+            支持 JPEG、PNG、WebP，原图最多 8 MB。图片只在当前浏览器内解码、缩放和压缩，不会上传服务器或请求模型。
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <label className="inline-flex cursor-pointer items-center border border-amber-700/40 px-3 py-2 text-xs font-semibold text-amber-900">
+              <input
+                type="file"
+                accept={CHARACTER_PORTRAIT_ALLOWED_MIME_TYPES.join(",")}
+                className="sr-only"
+                disabled={busy}
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  event.currentTarget.value = "";
+                  void handleFile(file);
+                }}
+              />
+              <i className="fa-solid fa-upload mr-2" aria-hidden="true" />
+              {busy ? "处理中…" : value ? "更换照片" : "选择照片"}
+            </label>
+            {value && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(undefined);
+                  setSummary("");
+                  onError("");
+                }}
+                className="border border-clay-900/12 px-3 py-2 text-xs text-clay-600"
+              >
+                移除
+              </button>
+            )}
+          </div>
+          {summary && (
+            <p className="mt-2 text-[11px] leading-5 text-teal-700">{summary}</p>
+          )}
+          <p className="mt-3 text-[11px] leading-5 text-clay-500">
+            仅保存在当前浏览器；未来用于模型生成前，仍会单独展示费用与真人素材授权提示。
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function StoryCharacterModal({
   session,
   onClose,
@@ -548,6 +679,7 @@ export function StoryCharacterModal({
   const [customRoles, setCustomRoles] = useState<StoryCharacterModalRole[]>([]);
   const [tab, setTab] = useState<"story" | "mine" | "create">("story");
   const [form, setForm] = useState<CharacterForm>(DEFAULT_FORM);
+  const [createFeedback, setCreateFeedback] = useState("");
   const existingNames = useMemo(
     () => [
       ...(session?.characters.map((character) => character.alias || character.canonicalName || character.name) ?? []),
@@ -587,16 +719,26 @@ export function StoryCharacterModal({
   }, [onClose]);
 
   const chooseRole = (role: StoryCharacterModalRole) => {
-    saveSelectedRole(role);
-    onSelect(role);
+    const roleWithoutLocalPortrait = role.portraitUrl
+      ? { ...role, portraitUrl: undefined }
+      : role;
+    saveSelectedRole(roleWithoutLocalPortrait);
+    onSelect(roleWithoutLocalPortrait);
     onClose();
   };
 
   const createRole = () => {
     const name = form.name.trim();
     const safeName = sanitizeCharacterName(name);
-    if (!safeName) return;
-    if (existingNames.some((existing) => areNamesTooSimilar(safeName, existing))) return;
+    setCreateFeedback("");
+    if (!safeName) {
+      setCreateFeedback("请填写安全有效的角色姓名。");
+      return;
+    }
+    if (existingNames.some((existing) => areNamesTooSimilar(safeName, existing))) {
+      setCreateFeedback("角色姓名与本剧或“我的角色”过于相似，请更换后再保存。");
+      return;
+    }
     const voiceProfile = matchedVoiceProfile;
     const role: StoryCharacterModalRole = {
       id: `custom-${Date.now()}`,
@@ -612,10 +754,15 @@ export function StoryCharacterModal({
       stepfunVoiceId: voiceProfile.stepfunVoiceId,
       tags: ["我的角色", "本地保存", voiceProfile.label],
       nameSource: "user",
+      portraitUrl: form.portraitUrl,
     };
     const nextRoles = [role, ...customRoles].slice(0, 24);
+    const storageResult = writeCustomRoles(nextRoles);
+    if (!storageResult.ok) {
+      setCreateFeedback(storageResult.message);
+      return;
+    }
     setCustomRoles(nextRoles);
-    writeCustomRoles(nextRoles);
     rememberCharacterName(safeName);
     chooseRole(role);
   };
@@ -632,7 +779,9 @@ export function StoryCharacterModal({
       voiceAgeRange: voiceProfile.ageRange,
       voiceStyle: voiceProfile.style === "narrator" ? "calm" : voiceProfile.style,
       narratorVoice: voiceProfile.narrator === true || voiceProfile.gender === "neutral" || voiceProfile.style === "narrator",
+      portraitUrl: undefined,
     });
+    setCreateFeedback("");
     setTab("create");
   };
 
@@ -777,6 +926,14 @@ export function StoryCharacterModal({
                       className="mt-2 w-full resize-none border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-amber-700/55"
                     />
                   </label>
+                  <CharacterReferencePhotoField
+                    value={form.portraitUrl}
+                    onChange={(portraitUrl) => {
+                      setForm((value) => ({ ...value, portraitUrl }));
+                      setCreateFeedback("");
+                    }}
+                    onError={setCreateFeedback}
+                  />
                   <div className="grid gap-4 md:grid-cols-2">
                     <label className="block">
                       <span className="text-sm font-semibold text-clay-700">画面风格</span>
@@ -863,6 +1020,14 @@ export function StoryCharacterModal({
                     </div>
                   </div>
 
+                  {createFeedback && (
+                    <p
+                      role="status"
+                      className="border border-red-700/25 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800"
+                    >
+                      {createFeedback}
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={createRole}
@@ -886,6 +1051,9 @@ export function StoryCharacterModal({
                   </div>
                   <p className="mt-4 text-xs leading-6 text-clay-500">
                     男性角色只调用男声资源；女性角色只调用女声资源；旁白声线需单独勾选，不会和角色对白混用。
+                  </p>
+                  <p className="mt-4 border-t border-clay-900/10 pt-4 text-xs leading-6 text-clay-500">
+                    一键生图与声音克隆将在费用报价、手机号登录及真人素材授权门禁完成后开放；当前没有可点击的占位按钮，也不会发起模型请求。
                   </p>
                 </aside>
               </div>
