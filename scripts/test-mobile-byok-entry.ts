@@ -12,10 +12,10 @@ async function main(): Promise<void> {
     "utf8",
   );
 
-  assert.match(
-    mobileSource,
-    /import \{ SettingsModal \} from "@\/components\/SettingsModal"/,
-  );
+assert.match(
+  mobileSource,
+  /import\s*\{[^}]*\bSettingsModal\b[^}]*\}\s*from "@\/components\/SettingsModal"/,
+);
   assert.match(mobileSource, /我的 API（BYOK）/);
   assert.match(mobileSource, /打开我的 API 设置/);
   assert.match(mobileSource, /initialTab="models"/);

@@ -489,13 +489,10 @@ export function MobileDreamFrameApp() {
                 <span><strong>12处</strong>关键节点</span>
                 <span><strong>2套</strong>横竖屏资产</span>
               </div>
-              <div className="mobile-df-row-actions">
+              <div className="mobile-df-row-actions mobile-df-single-action">
                 <button type="button" onClick={() => setTip("支持粘贴文本或上传小说文档")}>
                   上传文档
                 </button>
-                <Link href={lp(`/studio?seed=${encodeURIComponent(storySeed)}`)}>
-                  进入编辑台
-                </Link>
               </div>
             </div>
           </section>

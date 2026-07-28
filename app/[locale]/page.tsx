@@ -25,7 +25,7 @@ import { readStoredModelConfig, resolveEngineConfig } from "@/lib/clientModelCon
 import { STYLE_EXTRACTION_PROMPT } from "@/lib/styleExtraction";
 import { STORY_SHARE_STORAGE_KEY, parseStoryShareDoc } from "@/lib/storyShare";
 import { AUTH_ENABLED } from "@/lib/supabase/config";
-import { isAuthed, writeResumeSnapshot } from "@/lib/authResume";
+import { isAuthed } from "@/lib/authResume";
 import {
   AuthModal,
   type AuthRequirement,
@@ -1134,29 +1134,8 @@ export default function HomePage() {
     });
   };
 
-  // ── Auth-gated resume (OAuth round-trips lose all React state) ──────────
-  // An OAuth login unmounts the homepage and discards everything the user
-  // typed. We snapshot the form before redirecting and replay it on return.
-  // The email-OTP path keeps state in place and resumes synchronously via
-  // AuthModal.onSuccess instead.
+  // Backward compatibility for pre-phone-login OAuth resume snapshots.
   const [autoStartPending, setAutoStartPending] = useState(false);
-
-  const persistPendingStart = () => {
-    const snap = {
-      prompt,
-      sel,
-      customStyleGuide,
-      customStyleRefImage,
-      imageStoryPreview,
-      imageStoryAnalysis,
-      playerName,
-    };
-    // Quota fallback: the data-URL style ref (~100KB) is the usual culprit —
-    // drop it first; text-only form still resumes the start.
-    writeResumeSnapshot(PENDING_START_KEY, snap, [
-      { ...snap, customStyleRefImage: "", imageStoryPreview: "" },
-    ]);
-  };
 
   const resumePendingParse = async () => {
     const resized = sessionStorage.getItem(PENDING_PARSE_KEY);
@@ -1205,8 +1184,7 @@ export default function HomePage() {
     }
   };
 
-  // On mount after an OAuth redirect: if a pending action was left and the user
-  // is now signed in, restore and continue; otherwise clear stale snapshots.
+  // Consume an older persisted login snapshot once, then remove it.
   useEffect(() => {
     if (!AUTH_ENABLED) return;
     const hasStart = sessionStorage.getItem(PENDING_START_KEY) !== null;
@@ -1738,26 +1716,13 @@ export default function HomePage() {
 
           <div
             data-home-information-card
-            className="relative mx-auto mt-5 max-w-[820px] rounded-md border border-clay-900/10 bg-cream-100/50 px-6 py-4 text-left md:px-8 md:py-5"
+            className="relative mx-auto mt-5 w-full max-w-full rounded-md border border-clay-900/10 bg-cream-100/50 px-6 py-4 text-left md:max-w-[1066px] md:px-8 md:py-5"
           >
-            <UsageDisclosureNote
-              action="start_custom"
-              audioEnabled={selectedAudioEnabled}
-              prefetchDepth={branchPrefetchDepth}
-              refreshKey={settingsOpen}
-              variant="plain"
-              className="pr-6 text-xs leading-relaxed text-clay-600"
-            />
-
             {/* 可选引导沿用 localStorage:infiplot:hintClosed；强制调用披露始终保留。 */}
             {!hintClosed && (
-              <div className="mt-3 border-t border-clay-900/10 pt-3">
-                <p
-                  className="pr-6 font-serif text-[13px] leading-relaxed text-clay-500"
-                  dangerouslySetInnerHTML={{ __html: t("home.hint.text", { authEnabled: AUTH_ENABLED }) }}
-                />
-                <p className="mt-2 pr-6 text-[11px] leading-relaxed text-clay-400 md:text-xs">
-                  <span className="font-medium text-clay-500">AIstory</span>{" "}
+              <>
+                <p className="pr-10 font-serif text-lg font-medium leading-7 text-clay-700 md:text-xl">
+                  <span className="text-clay-800">AIstory</span>{" "}
                   {t("home.about.description")}
                 </p>
                 <button
@@ -1768,6 +1733,26 @@ export default function HomePage() {
                 >
                   <i className="fa-solid fa-xmark text-xs" />
                 </button>
+              </>
+            )}
+
+            <div className={!hintClosed ? "mt-4 border-t border-clay-900/10 pt-3" : ""}>
+              <UsageDisclosureNote
+                action="start_custom"
+                audioEnabled={selectedAudioEnabled}
+                prefetchDepth={branchPrefetchDepth}
+                refreshKey={settingsOpen}
+                variant="plain"
+                className="pr-6 text-xs leading-relaxed text-clay-600"
+              />
+            </div>
+
+            {!hintClosed && (
+              <div className="mt-3 border-t border-clay-900/10 pt-3">
+                <p
+                  className="pr-6 font-serif text-[13px] leading-relaxed text-clay-500"
+                  dangerouslySetInnerHTML={{ __html: t("home.hint.text", { authEnabled: AUTH_ENABLED }) }}
+                />
               </div>
             )}
           </div>
@@ -1930,9 +1915,7 @@ export default function HomePage() {
           onSuccess={() => {
             setAuthModalOpen(false);
             setAuthRequirement(undefined);
-            // Email-OTP stays on the page, so resume inline: parse first (it
-            // reads its own snapshot), then the pending start. OTP never
-            // triggers onBeforeOAuth, so no PENDING_START snapshot was written.
+            // Phone OTP stays on the page, so resume the gated action inline.
             void resumePendingParse();
             if (pendingAction === "start") {
               setPendingAction(null);
@@ -1943,16 +1926,6 @@ export default function HomePage() {
               }
               void start();
             }
-          }}
-          //
-          // Only snapshot when the user is mid-start: the OAuth redirect also
-          // fires for bare logins (UserChip / StyleModal onRequireAuth), where
-          // the user just wants to sign in — not kick off a game. Guarding on
-          // pendingAction keeps bare logins from auto-starting a session on
-          // return. (start() sets pendingAction="start" right before opening
-          // this modal.)
-          onBeforeOAuth={() => {
-            if (pendingAction === "start") persistPendingStart();
           }}
           requirement={authRequirement}
         />
