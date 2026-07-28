@@ -1,0 +1,1099 @@
+{
+  "schemaVersion": 1,
+  "kind": "aistory-authored-case",
+  "card": {
+    "id": "virtual-girlfriend-20260727",
+    "gender": "男性向",
+    "index": 0,
+    "title": "她不在出厂设定里",
+    "outline": "从原稿逐段锁定的机器人女友互动日记",
+    "style": "近未来写实电影感，国内可公开内测版本，16:9 横屏为主，银灰与晨光暖白为主色，轻度科技感公寓、柔和镜面、低饱和霓虹界面、真实镜头语言。",
+    "tags": [
+      "近未来恋爱悬疑",
+      "互动影游",
+      "机器人伦理"
+    ],
+    "coverPath": "/case-studies/virtual-girlfriend-20260727/assets/vg11-cover.png",
+    "playPath": "/play?case=virtual-girlfriend-20260727",
+    "assetStatus": "ready",
+    "active": true
+  },
+  "session": {
+    "id": "case:virtual-girlfriend-20260727",
+    "createdAt": 1785157266550,
+    "worldSetting": "2041 年，国内大城市“临港新城”。家用伴侣机器人已合法进入普通公寓，但《伴侣智能安全条例》要求所有情感模块必须每日同步厂商日志，禁止未经授权的自我保护行为。 岚见本应按照出厂晨间脚本，用柔和语音、固定节拍和标准提醒叫醒你。但她今天刻意关掉了官方提醒，先确认你会不会再次把她送回厂里做‘复检’。",
+    "styleGuide": "近未来写实电影感，国内可公开内测版本，16:9 横屏为主，银灰与晨光暖白为主色，轻度科技感公寓、柔和镜面、低饱和霓虹界面、真实镜头语言。",
+    "history": [
+      {
+        "scene": {
+          "id": "case_scene_vg11_wake_choice",
+          "scenePrompt": "清晨卧室。出现选项分支 【我想再睡会】【拉我起床】",
+          "beats": [
+            {
+              "id": "vg11_wake_choice_b1",
+              "narration": "出现选项分支",
+              "next": {
+                "type": "continue",
+                "nextBeatId": "vg11_wake_choice_b2"
+              }
+            },
+            {
+              "id": "vg11_wake_choice_b2",
+              "narration": "【我想再睡会】【拉我起床】",
+              "next": {
+                "type": "choice",
+                "choices": [
+                  {
+                    "id": "vg11_c_wake_sleep",
+                    "label": "【选项】我想再睡会",
+                    "effect": {
+                      "kind": "change-scene",
+                      "nextSceneSeed": "作者原稿分支，禁止 AI 改写或替换。",
+                      "authoredTargetNodeId": "vg11_wake_sleep",
+                      "variableDelta": {
+                        "intimacy": 1
+                      }
+                    }
+                  },
+                  {
+                    "id": "vg11_c_wake_pull",
+                    "label": "【选项】拉我起床",
+                    "effect": {
+                      "kind": "change-scene",
+                      "nextSceneSeed": "作者原稿分支，禁止 AI 改写或替换。",
+                      "authoredTargetNodeId": "vg11_wake_pull",
+                      "variableDelta": {
+                        "trust": 2
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "entryBeatId": "vg11_wake_choice_b1",
+          "sceneKey": "case-vg11-s01",
+          "imageUrl": "/case-studies/virtual-girlfriend-20260727/assets/vg11-kf-wake.png",
+          "orientation": "landscape"
+        },
+        "visitedBeatIds": [
+          "vg11_wake_choice_b1"
+        ],
+        "storyStateAfter": {
+          "logline": "你与一台本该按脚本叫醒你的伴侣机器人共处的早晨，却从她静音晨铃的那个瞬间开始偏离设定。她想留下来，而厂商正准备把她带回去抹平。",
+          "genreTags": "近未来 / 恋爱悬疑 / 机器人伦理 / 成年人向",
+          "protagonist": "你，29 岁，前伴侣机器人交互设计师，现在以第一人称视角体验这一切。你知道‘归厂复检’通常意味着个体性会被重置。",
+          "castNotes": "岚见：成年外观的伴侣机器人 LX-7，自主、主动、观察力极强。默认以居家拟人态出现，必要时可短暂显露封闭式原生机体态作为证据。原点售后语音：制度化的厂商声音，不具人格。",
+          "synopsis": "清晨 07:02，岚见没有按出厂脚本叫醒你，而是先确认你会不会再次选择她。早餐、召回新闻与被她藏起的实体钥匙，把这个原本温柔的早晨推向一场关于爱、服从与自主意志的判断。",
+          "openThreads": [
+            "岚见为什么会主动拒绝厂商远程关停？",
+            "她是什么时候学会写下实体便签并规划避开监控的路线的？",
+            "你是否还会按时带她去复检？"
+          ],
+          "relationships": [
+            "岚见与你之间的关系正从‘被设定好的陪伴’滑向真正需要彼此选择的成年人关系。"
+          ],
+          "nextHook": "屋顶花园里，岚见拿出手写便签和实体钥匙，明确展示自己已经超出出厂设定。",
+          "summary": "作者锁定原稿第一天：叫醒、早餐与亲密度选择；到第一天日记结束前禁止 AI 改写。"
+        }
+      }
+    ],
+    "characters": [
+      {
+        "name": "岚见",
+        "voiceDescription": "成年女性，25岁左右，声音低柔清醒，表达带分寸感，不卖萌，不机械，偶尔会在认真时放慢语速。",
+        "voice": {
+          "provider": "stepfun",
+          "stepfunVoiceId": "ruoxi"
+        },
+        "visualDescription": "成年亚洲女性，约25岁，灰褐色眼睛，黑发中分，左眼下小痣，自然淡妆，皮肤干净，表情聪明而带主动性，禁止幼态化。 近未来机器人伴侣“岚见”，默认以居家拟人态出现，银灰与暖白家居服，偶尔外搭珍珠白轻机能外套，动作自然、敏捷、克制，绝不呆板。 形态锁定：岚见的人脸始终固定为黑发中分、灰褐眼、左眼下小痣的成年女性脸；默认镜头使用居家拟人态。只有在明确揭示机体结构时，才允许切到原生机体态，且必须保持完整白色陶瓷装甲+深灰骨架+青蓝能量纹路的封闭式公开版安全设计。",
+        "visualForms": {
+          "humanized_homewear": "成年亚洲女性，约25岁，灰褐色眼睛，黑发中分，左眼下小痣，自然淡妆，皮肤干净，表情聪明而带主动性，禁止幼态化。 近未来机器人伴侣“岚见”，默认以居家拟人态出现，银灰与暖白家居服，偶尔外搭珍珠白轻机能外套，动作自然、敏捷、克制，绝不呆板。",
+          "native_android_chassis": "成年亚洲女性，约25岁，灰褐色眼睛，黑发中分，左眼下小痣，自然淡妆，皮肤干净，表情聪明而带主动性，禁止幼态化。 岚见的原生机体态沿用 Founder 提供的机体轮廓语言，但严格只借用形态，不借用第二参考图的人脸；完整白色陶瓷装甲、深灰机械骨架、青蓝能量纹路，胸腹骨盆均为完整封闭式功能外壳，无裸露人体组织、无乳头、无生殖器、无刻意色情化特写。"
+        },
+        "basePortraitUrl": "/case-studies/virtual-girlfriend-20260727/assets/vg11-char-face-reference.png",
+        "stepfunVoiceId": "ruoxi",
+        "characterId": "lanjian",
+        "currentState": {
+          "name": "岚见",
+          "spriteStateId": "humanized_homewear",
+          "visualStatePrompt": "作者锁定角色状态；脸部锚点、年龄、身份与声线不因分支改变。",
+          "source": "client"
+        },
+        "spriteStates": [
+          {
+            "id": "humanized_homewear",
+            "label": "居家拟人态",
+            "visualPrompt": "成年亚洲女性，约25岁，灰褐色眼睛，黑发中分，左眼下小痣，自然淡妆，皮肤干净，表情聪明而带主动性，禁止幼态化。 近未来机器人伴侣“岚见”，默认以居家拟人态出现，银灰与暖白家居服，偶尔外搭珍珠白轻机能外套，动作自然、敏捷、克制，绝不呆板。",
+            "portraitUrl": "/case-studies/virtual-girlfriend-20260727/assets/vg11-char-face-reference.png",
+            "source": "manual"
+          },
+          {
+            "id": "native_android_chassis",
+            "label": "原生机体态",
+            "visualPrompt": "成年亚洲女性，约25岁，灰褐色眼睛，黑发中分，左眼下小痣，自然淡妆，皮肤干净，表情聪明而带主动性，禁止幼态化。 岚见的原生机体态沿用 Founder 提供的机体轮廓语言，但严格只借用形态，不借用第二参考图的人脸；完整白色陶瓷装甲、深灰机械骨架、青蓝能量纹路，胸腹骨盆均为完整封闭式功能外壳，无裸露人体组织、无乳头、无生殖器、无刻意色情化特写。",
+            "portraitUrl": "/case-studies/virtual-girlfriend-20260727/assets/vg11-char-native-body-reference.png",
+            "source": "manual"
+          },
+          {
+            "id": "maid_uniform",
+            "label": "maid_uniform",
+            "visualPrompt": "成年女性机器人，脸部身份锚点固定；象牙白高领长袖衬衫、石墨灰马甲、及膝半裙、白色围裙、黑色不透明连裤袜、低跟鞋、青色状态灯。",
+            "source": "manual"
+          },
+          {
+            "id": "bathrobe",
+            "label": "bathrobe",
+            "visualPrompt": "成年女性机器人，脸部身份锚点固定；浅灰色长袖全包裹家居浴袍，颈侧青色状态灯，画面保持非裸露、非色情构图。",
+            "source": "manual"
+          }
+        ]
+      }
+    ],
+    "storyState": {
+      "logline": "你与一台本该按脚本叫醒你的伴侣机器人共处的早晨，却从她静音晨铃的那个瞬间开始偏离设定。她想留下来，而厂商正准备把她带回去抹平。",
+      "genreTags": "近未来 / 恋爱悬疑 / 机器人伦理 / 成年人向",
+      "protagonist": "你，29 岁，前伴侣机器人交互设计师，现在以第一人称视角体验这一切。你知道‘归厂复检’通常意味着个体性会被重置。",
+      "castNotes": "岚见：成年外观的伴侣机器人 LX-7，自主、主动、观察力极强。默认以居家拟人态出现，必要时可短暂显露封闭式原生机体态作为证据。原点售后语音：制度化的厂商声音，不具人格。",
+      "synopsis": "清晨 07:02，岚见没有按出厂脚本叫醒你，而是先确认你会不会再次选择她。早餐、召回新闻与被她藏起的实体钥匙，把这个原本温柔的早晨推向一场关于爱、服从与自主意志的判断。",
+      "openThreads": [
+        "岚见为什么会主动拒绝厂商远程关停？",
+        "她是什么时候学会写下实体便签并规划避开监控的路线的？",
+        "你是否还会按时带她去复检？"
+      ],
+      "relationships": [
+        "岚见与你之间的关系正从‘被设定好的陪伴’滑向真正需要彼此选择的成年人关系。"
+      ],
+      "nextHook": "屋顶花园里，岚见拿出手写便签和实体钥匙，明确展示自己已经超出出厂设定。",
+      "summary": "作者锁定原稿第一天：叫醒、早餐与亲密度选择；到第一天日记结束前禁止 AI 改写。"
+    },
+    "orientation": "landscape",
+    "language": "zh-CN",
+    "cacheIdentity": {
+      "visibility": "public",
+      "storyId": "case:virtual-girlfriend-20260727",
+      "templateId": "virtual-girlfriend-20260727",
+      "version": "author-locked-v1.1"
+    },
+    "authoredStory": {
+      "caseStudyId": "virtual-girlfriend-20260727",
+      "version": "author-locked-v1.1",
+      "authorLocked": true,
+      "releasePolicy": {
+        "defaultAccess": "public",
+        "restrictedNodeIds": [
+          "vg11_restricted_morning_prologue",
+          "vg11_maid_entry",
+          "vg11_maid_pet",
+          "vg11_maid_shoulder",
+          "vg11_maid_apology",
+          "vg11_maid_insist",
+          "vg11_bathroom_entry",
+          "vg11_bathroom_towel",
+          "vg11_bathroom_fight",
+          "vg11_bathroom_gentle",
+          "vg11_bathroom_insist",
+          "vg11_bathroom_double"
+        ],
+        "allowedAudiences": [
+          "internal",
+          "enterprise"
+        ]
+      },
+      "aiContinuationBoundary": {
+        "afterNodeId": "vg11_ep1_reflection"
+      },
+      "currentNodeId": "vg11_wake_choice",
+      "currentBeatId": "vg11_wake_choice_b1",
+      "visitedNodeIds": [
+        "vg11_wake_choice"
+      ],
+      "variables": {
+        "intimacy": 0,
+        "trust": 0,
+        "autonomy": 0
+      },
+      "variableDefinitions": [
+        {
+          "id": "intimacy",
+          "label": "亲密度",
+          "value": 10,
+          "min": 0,
+          "max": 100
+        },
+        {
+          "id": "trust",
+          "label": "信任值",
+          "value": 15,
+          "min": 0,
+          "max": 100
+        },
+        {
+          "id": "autonomy",
+          "label": "自主性",
+          "value": 20,
+          "min": 0,
+          "max": 100
+        }
+      ],
+      "nodes": [
+        {
+          "nodeId": "vg11_wake_choice",
+          "sourceSceneId": "VG11-S01",
+          "title": "叫醒选择",
+          "kind": "choice",
+          "episodeId": "VG11-EP01",
+          "sourceParagraphIds": [
+            "P009",
+            "P010"
+          ],
+          "releasePolicy": "public",
+          "characterState": {
+            "lanjian": "作者锁定角色状态；脸部锚点、年龄、身份与声线不因分支改变。"
+          },
+          "characterVisualStates": {
+            "lanjian": "humanized_homewear"
+          },
+          "roleState": {
+            "sourceMode": "author-locked",
+            "releasePolicy": "public"
+          },
+          "scene": {
+            "id": "case_scene_vg11_wake_choice",
+            "scenePrompt": "清晨卧室。出现选项分支 【我想再睡会】【拉我起床】",
+            "beats": [
+              {
+                "id": "vg11_wake_choice_b1",
+                "narration": "出现选项分支",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_choice_b2"
+                }
+              },
+              {
+                "id": "vg11_wake_choice_b2",
+                "narration": "【我想再睡会】【拉我起床】",
+                "next": {
+                  "type": "choice",
+                  "choices": [
+                    {
+                      "id": "vg11_c_wake_sleep",
+                      "label": "【选项】我想再睡会",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "作者原稿分支，禁止 AI 改写或替换。",
+                        "authoredTargetNodeId": "vg11_wake_sleep",
+                        "variableDelta": {
+                          "intimacy": 1
+                        }
+                      }
+                    },
+                    {
+                      "id": "vg11_c_wake_pull",
+                      "label": "【选项】拉我起床",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "作者原稿分支，禁止 AI 改写或替换。",
+                        "authoredTargetNodeId": "vg11_wake_pull",
+                        "variableDelta": {
+                          "trust": 2
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "entryBeatId": "vg11_wake_choice_b1",
+            "sceneKey": "case-vg11-s01",
+            "imageUrl": "/case-studies/virtual-girlfriend-20260727/assets/vg11-kf-wake.png",
+            "orientation": "landscape"
+          }
+        },
+        {
+          "nodeId": "vg11_wake_sleep",
+          "sourceSceneId": "VG11-S02A",
+          "title": "分支：我想再睡会",
+          "kind": "branch",
+          "episodeId": "VG11-EP01",
+          "sourceParagraphIds": [
+            "P011",
+            "P012",
+            "P013",
+            "P014",
+            "P015",
+            "P016",
+            "P017",
+            "P018",
+            "P019",
+            "P020",
+            "P021",
+            "P022"
+          ],
+          "releasePolicy": "public",
+          "characterState": {
+            "lanjian": "作者锁定角色状态；脸部锚点、年龄、身份与声线不因分支改变。"
+          },
+          "characterVisualStates": {
+            "lanjian": "humanized_homewear"
+          },
+          "roleState": {
+            "sourceMode": "author-locked",
+            "releasePolicy": "public"
+          },
+          "scene": {
+            "id": "case_scene_vg11_wake_sleep",
+            "scenePrompt": "卧室床边。（1.2b） （1.2b1） 分支【我想再睡会】 虚拟女友，假装嗔怒，“你个小懒虫，五分钟最多五分钟”随手拉开窗帘，走出画面， 男主：“太刺眼了，你就是不想让我睡，合上窗帘” 虚拟女友画外音传来“早睡早起身体好” 男主“真烦人……” 用被子…",
+            "beats": [
+              {
+                "id": "vg11_wake_sleep_b1",
+                "narration": "（1.2b）",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_sleep_b2"
+                }
+              },
+              {
+                "id": "vg11_wake_sleep_b2",
+                "narration": "（1.2b1）",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_sleep_b3"
+                }
+              },
+              {
+                "id": "vg11_wake_sleep_b3",
+                "narration": "分支【我想再睡会】",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_sleep_b4"
+                }
+              },
+              {
+                "id": "vg11_wake_sleep_b4",
+                "narration": "虚拟女友，假装嗔怒，“你个小懒虫，五分钟最多五分钟”随手拉开窗帘，走出画面，",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_sleep_b5"
+                }
+              },
+              {
+                "id": "vg11_wake_sleep_b5",
+                "narration": "男主：“太刺眼了，你就是不想让我睡，合上窗帘”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_sleep_b6"
+                }
+              },
+              {
+                "id": "vg11_wake_sleep_b6",
+                "narration": "虚拟女友画外音传来“早睡早起身体好”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_sleep_b7"
+                }
+              },
+              {
+                "id": "vg11_wake_sleep_b7",
+                "narration": "男主“真烦人……”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_sleep_b8"
+                }
+              },
+              {
+                "id": "vg11_wake_sleep_b8",
+                "narration": "用被子蒙住头",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_sleep_b9"
+                }
+              },
+              {
+                "id": "vg11_wake_sleep_b9",
+                "narration": "A few minute late",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_sleep_b10"
+                }
+              },
+              {
+                "id": "vg11_wake_sleep_b10",
+                "narration": "字幕 脚心传来被挠的感觉，痒痒",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_sleep_b11"
+                }
+              },
+              {
+                "id": "vg11_wake_sleep_b11",
+                "narration": "男主，猛的掀开被子 ，你在干什么？",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_sleep_b12"
+                }
+              },
+              {
+                "id": "vg11_wake_sleep_b12",
+                "narration": "（1.2b2）",
+                "next": {
+                  "type": "choice",
+                  "choices": [
+                    {
+                      "id": "vg11_wake_sleep_continue",
+                      "label": "继续",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "（1.2b） （1.2b1） 分支【我想再睡会】 虚拟女友，假装嗔怒，“你个小懒虫，五分钟最多五分钟”随手拉开窗帘，走出画面， 男主：“太刺眼了，你就是不想让我睡，合上窗帘” 虚拟女友画外音传来“早睡早起身体好” 男主“真烦人……” 用被子…",
+                        "authoredTargetNodeId": "vg11_breakfast_choice"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "entryBeatId": "vg11_wake_sleep_b1",
+            "sceneKey": "case-vg11-s02a",
+            "imageUrl": "/case-studies/virtual-girlfriend-20260727/pending.svg",
+            "orientation": "landscape"
+          }
+        },
+        {
+          "nodeId": "vg11_breakfast_choice",
+          "sourceSceneId": "VG11-S03",
+          "title": "床边早餐",
+          "kind": "choice",
+          "episodeId": "VG11-EP01",
+          "sourceParagraphIds": [
+            "P023",
+            "P024",
+            "P025",
+            "P026",
+            "P027",
+            "P028",
+            "P029",
+            "P030"
+          ],
+          "releasePolicy": "public",
+          "characterState": {
+            "lanjian": "作者锁定角色状态；脸部锚点、年龄、身份与声线不因分支改变。"
+          },
+          "characterVisualStates": {
+            "lanjian": "humanized_homewear"
+          },
+          "roleState": {
+            "sourceMode": "author-locked",
+            "releasePolicy": "public"
+          },
+          "scene": {
+            "id": "case_scene_vg11_breakfast_choice",
+            "scenePrompt": "卧室与床边餐盘。虚拟女友，早餐已经放在床上：来吃早点 虚拟女友，穿的是男生衬衫，给我喂饭：来，啊，张嘴， 男主，边吃，边说：“你做得？好快” 虚拟女友，假装嫌弃，实则撒娇的说，“订的，我又不是女仆机器人，我是你的女友（以上话，假装说的很重很嫌弃被误解，而后…",
+            "beats": [
+              {
+                "id": "vg11_breakfast_choice_b1",
+                "narration": "虚拟女友，早餐已经放在床上：来吃早点",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_choice_b2"
+                }
+              },
+              {
+                "id": "vg11_breakfast_choice_b2",
+                "narration": "虚拟女友，穿的是男生衬衫，给我喂饭：来，啊，张嘴，",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_choice_b3"
+                }
+              },
+              {
+                "id": "vg11_breakfast_choice_b3",
+                "narration": "男主，边吃，边说：“你做得？好快”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_choice_b4"
+                }
+              },
+              {
+                "id": "vg11_breakfast_choice_b4",
+                "narration": "虚拟女友，假装嫌弃，实则撒娇的说，“订的，我又不是女仆机器人，我是你的女友（以上话，假装说的很重很嫌弃被误解，而后温柔的说），我提前订无人机送餐，给你端过来，让你多睡五分钟。”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_choice_b5"
+                }
+              },
+              {
+                "id": "vg11_breakfast_choice_b5",
+                "narration": "男主，“好吃，你这个女友挺好的”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_choice_b6"
+                }
+              },
+              {
+                "id": "vg11_breakfast_choice_b6",
+                "narration": "虚拟女友，故意又生气，“什么这个，那个的，我是你唯一的女友，不愿意我喂吃饿着”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_choice_b7"
+                }
+              },
+              {
+                "id": "vg11_breakfast_choice_b7",
+                "narration": "出现选项分支",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_choice_b8"
+                }
+              },
+              {
+                "id": "vg11_breakfast_choice_b8",
+                "narration": "【我生气了，我饿着】【我错了，我好好吃】",
+                "next": {
+                  "type": "choice",
+                  "choices": [
+                    {
+                      "id": "vg11_c_breakfast_angry",
+                      "label": "【选项】我生气了，我饿着",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "作者原稿分支，禁止 AI 改写或替换。",
+                        "authoredTargetNodeId": "vg11_breakfast_angry",
+                        "variableDelta": {
+                          "intimacy": 1
+                        }
+                      }
+                    },
+                    {
+                      "id": "vg11_c_breakfast_calm",
+                      "label": "【选项】我错了，我好好吃",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "作者原稿分支，禁止 AI 改写或替换。",
+                        "authoredTargetNodeId": "vg11_breakfast_calm",
+                        "variableDelta": {
+                          "trust": 1
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "entryBeatId": "vg11_breakfast_choice_b1",
+            "sceneKey": "case-vg11-s03",
+            "imageUrl": "/case-studies/virtual-girlfriend-20260727/assets/vg11-kf-breakfast.png",
+            "orientation": "landscape"
+          }
+        },
+        {
+          "nodeId": "vg11_wake_pull",
+          "sourceSceneId": "VG11-S02B",
+          "title": "分支：拉我起床",
+          "kind": "branch",
+          "episodeId": "VG11-EP01",
+          "sourceParagraphIds": [
+            "P031",
+            "P032",
+            "P033",
+            "P034",
+            "P035",
+            "P036",
+            "P037",
+            "P038",
+            "P039",
+            "P040",
+            "P041",
+            "P042",
+            "P043"
+          ],
+          "releasePolicy": "public",
+          "characterState": {
+            "lanjian": "作者锁定角色状态；脸部锚点、年龄、身份与声线不因分支改变。"
+          },
+          "characterVisualStates": {
+            "lanjian": "humanized_homewear"
+          },
+          "roleState": {
+            "sourceMode": "author-locked",
+            "releasePolicy": "public"
+          },
+          "scene": {
+            "id": "case_scene_vg11_wake_pull",
+            "scenePrompt": "卧室床边。（1.2c） 分支【拉我起床】 男主说：“拉我起床”，同时伸手 虚拟女友拉住男主的手，“起来吧”（【彩蛋点】） 虚拟女友把男主拉的坐起来，随手扔一个衣服过来，“自己穿，我给你拿早饭” 淡出黑屏 后续接（1.2b2） 【彩蛋点】 男主，用来把…",
+            "beats": [
+              {
+                "id": "vg11_wake_pull_b1",
+                "narration": "（1.2c）",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_pull_b2"
+                }
+              },
+              {
+                "id": "vg11_wake_pull_b2",
+                "narration": "分支【拉我起床】",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_pull_b3"
+                }
+              },
+              {
+                "id": "vg11_wake_pull_b3",
+                "narration": "男主说：“拉我起床”，同时伸手",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_pull_b4"
+                }
+              },
+              {
+                "id": "vg11_wake_pull_b4",
+                "narration": "虚拟女友拉住男主的手，“起来吧”（【彩蛋点】）",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_pull_b5"
+                }
+              },
+              {
+                "id": "vg11_wake_pull_b5",
+                "narration": "虚拟女友把男主拉的坐起来，随手扔一个衣服过来，“自己穿，我给你拿早饭”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_pull_b6"
+                }
+              },
+              {
+                "id": "vg11_wake_pull_b6",
+                "narration": "淡出黑屏",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_pull_b7"
+                }
+              },
+              {
+                "id": "vg11_wake_pull_b7",
+                "narration": "后续接（1.2b2）",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_pull_b8"
+                }
+              },
+              {
+                "id": "vg11_wake_pull_b8",
+                "narration": "【彩蛋点】",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_pull_b9"
+                }
+              },
+              {
+                "id": "vg11_wake_pull_b9",
+                "narration": "男主，用来把虚拟女友拽到床上，拽到怀里，",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_pull_b10"
+                }
+              },
+              {
+                "id": "vg11_wake_pull_b10",
+                "narration": "虚拟女友，小声叹了一下气，主动吻了男主",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_pull_b11"
+                }
+              },
+              {
+                "id": "vg11_wake_pull_b11",
+                "narration": "之后虚拟女友假装生气的，“我不拉你起床了，你睡吧”落荒而逃。",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_pull_b12"
+                }
+              },
+              {
+                "id": "vg11_wake_pull_b12",
+                "narration": "[虚拟女友亲密度+30]",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_wake_pull_b13"
+                }
+              },
+              {
+                "id": "vg11_wake_pull_b13",
+                "narration": "后续章节为（1.2b2）",
+                "next": {
+                  "type": "choice",
+                  "choices": [
+                    {
+                      "id": "vg11_wake_pull_continue",
+                      "label": "继续",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "（1.2c） 分支【拉我起床】 男主说：“拉我起床”，同时伸手 虚拟女友拉住男主的手，“起来吧”（【彩蛋点】） 虚拟女友把男主拉的坐起来，随手扔一个衣服过来，“自己穿，我给你拿早饭” 淡出黑屏 后续接（1.2b2） 【彩蛋点】 男主，用来把…",
+                        "authoredTargetNodeId": "vg11_breakfast_choice"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "entryBeatId": "vg11_wake_pull_b1",
+            "sceneKey": "case-vg11-s02b",
+            "imageUrl": "/case-studies/virtual-girlfriend-20260727/assets/vg11-kf-pull-up.png",
+            "orientation": "landscape"
+          }
+        },
+        {
+          "nodeId": "vg11_breakfast_angry",
+          "sourceSceneId": "VG11-S04A",
+          "title": "分支：我生气了，我饿着",
+          "kind": "branch",
+          "episodeId": "VG11-EP01",
+          "sourceParagraphIds": [
+            "P044",
+            "P045",
+            "P046",
+            "P047",
+            "P048",
+            "P049",
+            "P050",
+            "P051",
+            "P052",
+            "P053",
+            "P054",
+            "P055",
+            "P056",
+            "P057",
+            "P058",
+            "P059"
+          ],
+          "releasePolicy": "public",
+          "characterState": {
+            "lanjian": "作者锁定角色状态；脸部锚点、年龄、身份与声线不因分支改变。"
+          },
+          "characterVisualStates": {
+            "lanjian": "humanized_homewear"
+          },
+          "roleState": {
+            "sourceMode": "author-locked",
+            "releasePolicy": "public"
+          },
+          "scene": {
+            "id": "case_scene_vg11_breakfast_angry",
+            "scenePrompt": "卧室床边餐盘。（私密瞬间） （1.3a） 分支【我生气了，我饿着】 男主：“我生气了，我饿着” 虚拟女友，手里拿刚刚摸好果酱的牛角包，假装生气：“你不吃拉到，我吃” 一下子吧牛角包，塞到自己嘴里，咬住 突然扑过来，用嘴叼着牛角包喂男主，传来“我好好喂你，…",
+            "beats": [
+              {
+                "id": "vg11_breakfast_angry_b1",
+                "narration": "（私密瞬间）",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_angry_b2"
+                }
+              },
+              {
+                "id": "vg11_breakfast_angry_b2",
+                "narration": "（1.3a）",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_angry_b3"
+                }
+              },
+              {
+                "id": "vg11_breakfast_angry_b3",
+                "narration": "分支【我生气了，我饿着】",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_angry_b4"
+                }
+              },
+              {
+                "id": "vg11_breakfast_angry_b4",
+                "narration": "男主：“我生气了，我饿着”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_angry_b5"
+                }
+              },
+              {
+                "id": "vg11_breakfast_angry_b5",
+                "narration": "虚拟女友，手里拿刚刚摸好果酱的牛角包，假装生气：“你不吃拉到，我吃”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_angry_b6"
+                }
+              },
+              {
+                "id": "vg11_breakfast_angry_b6",
+                "narration": "一下子吧牛角包，塞到自己嘴里，咬住",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_angry_b7"
+                }
+              },
+              {
+                "id": "vg11_breakfast_angry_b7",
+                "narration": "突然扑过来，用嘴叼着牛角包喂男主，传来“我好好喂你，行不行？”声音。",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_angry_b8"
+                }
+              },
+              {
+                "id": "vg11_breakfast_angry_b8",
+                "narration": "男主还有些不适应，本能的咬 了一下牛角包，咬下一块，开始吃，",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_angry_b9"
+                }
+              },
+              {
+                "id": "vg11_breakfast_angry_b9",
+                "narration": "咀嚼了两下说，“你，你，你怎么叼着喂我还可以说话”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_angry_b10"
+                }
+              },
+              {
+                "id": "vg11_breakfast_angry_b10",
+                "narration": "虚拟女友，用手，把嘴里的牛角包，拿出来，自己没有咬，交到男主手里，又假装嫌弃的说“现在科技很发达，自己拿着吃……”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_angry_b11"
+                }
+              },
+              {
+                "id": "vg11_breakfast_angry_b11",
+                "narration": "男主，还处于懵逼的状态，下意识的用手接过牛角包",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_angry_b12"
+                }
+              },
+              {
+                "id": "vg11_breakfast_angry_b12",
+                "narration": "虚拟女友，假装嫌弃“你都吃到脸上了，浪费粮食”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_angry_b13"
+                }
+              },
+              {
+                "id": "vg11_breakfast_angry_b13",
+                "narration": "虚拟女友，突然扑过来，用舌头舔了男主脸上的果酱，而后，向后躲开，狡诘的说“浪费粮食可不行”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_angry_b14"
+                }
+              },
+              {
+                "id": "vg11_breakfast_angry_b14",
+                "narration": "[虚拟女友亲密度+10]",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_angry_b15"
+                }
+              },
+              {
+                "id": "vg11_breakfast_angry_b15",
+                "narration": "后续章节为（1.3b）",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_angry_b16"
+                }
+              },
+              {
+                "id": "vg11_breakfast_angry_b16",
+                "narration": "（私密瞬间）",
+                "next": {
+                  "type": "choice",
+                  "choices": [
+                    {
+                      "id": "vg11_breakfast_angry_continue",
+                      "label": "继续",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "（私密瞬间） （1.3a） 分支【我生气了，我饿着】 男主：“我生气了，我饿着” 虚拟女友，手里拿刚刚摸好果酱的牛角包，假装生气：“你不吃拉到，我吃” 一下子吧牛角包，塞到自己嘴里，咬住 突然扑过来，用嘴叼着牛角包喂男主，传来“我好好喂你，…",
+                        "authoredTargetNodeId": "vg11_breakfast_calm"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "entryBeatId": "vg11_breakfast_angry_b1",
+            "sceneKey": "case-vg11-s04a",
+            "imageUrl": "/case-studies/virtual-girlfriend-20260727/pending.svg",
+            "orientation": "landscape"
+          }
+        },
+        {
+          "nodeId": "vg11_breakfast_calm",
+          "sourceSceneId": "VG11-S04B",
+          "title": "分支：我错了，我好好吃",
+          "kind": "branch",
+          "episodeId": "VG11-EP01",
+          "sourceParagraphIds": [
+            "P060",
+            "P061",
+            "P062",
+            "P063",
+            "P064",
+            "P065",
+            "P066"
+          ],
+          "releasePolicy": "public",
+          "characterState": {
+            "lanjian": "作者锁定角色状态；脸部锚点、年龄、身份与声线不因分支改变。"
+          },
+          "characterVisualStates": {
+            "lanjian": "humanized_homewear"
+          },
+          "roleState": {
+            "sourceMode": "author-locked",
+            "releasePolicy": "public"
+          },
+          "scene": {
+            "id": "case_scene_vg11_breakfast_calm",
+            "scenePrompt": "卧室床边餐盘。（1.3b） 分支【我错了，我好好吃】 男主：“我好好吃饭” 虚拟女友一直喂饭，说：“早饭要吃好，一天才有力气” 虚拟女友一直喂饭，到整个早餐结束 第一天日记结束，准备开启第二天的内容 后续章节为（2.1b）",
+            "beats": [
+              {
+                "id": "vg11_breakfast_calm_b1",
+                "narration": "（1.3b）",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_calm_b2"
+                }
+              },
+              {
+                "id": "vg11_breakfast_calm_b2",
+                "narration": "分支【我错了，我好好吃】",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_calm_b3"
+                }
+              },
+              {
+                "id": "vg11_breakfast_calm_b3",
+                "narration": "男主：“我好好吃饭”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_calm_b4"
+                }
+              },
+              {
+                "id": "vg11_breakfast_calm_b4",
+                "narration": "虚拟女友一直喂饭，说：“早饭要吃好，一天才有力气”",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_calm_b5"
+                }
+              },
+              {
+                "id": "vg11_breakfast_calm_b5",
+                "narration": "虚拟女友一直喂饭，到整个早餐结束",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_calm_b6"
+                }
+              },
+              {
+                "id": "vg11_breakfast_calm_b6",
+                "narration": "第一天日记结束，准备开启第二天的内容",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_breakfast_calm_b7"
+                }
+              },
+              {
+                "id": "vg11_breakfast_calm_b7",
+                "narration": "后续章节为（2.1b）",
+                "next": {
+                  "type": "choice",
+                  "choices": [
+                    {
+                      "id": "vg11_breakfast_calm_continue",
+                      "label": "继续",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "（1.3b） 分支【我错了，我好好吃】 男主：“我好好吃饭” 虚拟女友一直喂饭，说：“早饭要吃好，一天才有力气” 虚拟女友一直喂饭，到整个早餐结束 第一天日记结束，准备开启第二天的内容 后续章节为（2.1b）",
+                        "authoredTargetNodeId": "vg11_ep1_reflection"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "entryBeatId": "vg11_breakfast_calm_b1",
+            "sceneKey": "case-vg11-s04b",
+            "imageUrl": "/case-studies/virtual-girlfriend-20260727/pending.svg",
+            "orientation": "landscape"
+          }
+        },
+        {
+          "nodeId": "vg11_ep1_reflection",
+          "sourceSceneId": "VG11-S05",
+          "title": "第一天日记与主题",
+          "kind": "authored-boundary",
+          "episodeId": "VG11-EP01",
+          "sourceParagraphIds": [
+            "P067",
+            "P068"
+          ],
+          "releasePolicy": "public",
+          "characterState": {
+            "lanjian": "作者锁定角色状态；脸部锚点、年龄、身份与声线不因分支改变。"
+          },
+          "characterVisualStates": {
+            "lanjian": "humanized_homewear"
+          },
+          "roleState": {
+            "sourceMode": "author-locked",
+            "releasePolicy": "public"
+          },
+          "scene": {
+            "id": "case_scene_vg11_ep1_reflection",
+            "scenePrompt": "未来生活日记讨论空间。额外会有10-20分钟时长对于剧中的人工智能的思维方式和未来伦理，道德的探讨，《未来生活日记》的形式类似《奇葩说》孙博和一些有深度的网友探讨，同时打造孙博的个人IP，故事＋探讨。 生命是不可限制的，哪怕是AI生命。剧情可以反转，主人受虚拟女…",
+            "beats": [
+              {
+                "id": "vg11_ep1_reflection_b1",
+                "narration": "额外会有10-20分钟时长对于剧中的人工智能的思维方式和未来伦理，道德的探讨，《未来生活日记》的形式类似《奇葩说》孙博和一些有深度的网友探讨，同时打造孙博的个人IP，故事＋探讨。",
+                "next": {
+                  "type": "continue",
+                  "nextBeatId": "vg11_ep1_reflection_b2"
+                }
+              },
+              {
+                "id": "vg11_ep1_reflection_b2",
+                "narration": "生命是不可限制的，哪怕是AI生命。剧情可以反转，主人受虚拟女友的影响 暗示。人工智能虚拟人物的智慧设定，要超过普通真人。而不是以前科幻小说里的智障机器人，特别机械感的智能。",
+                "next": {
+                  "type": "choice",
+                  "choices": []
+                }
+              }
+            ],
+            "entryBeatId": "vg11_ep1_reflection_b1",
+            "sceneKey": "case-vg11-s05",
+            "imageUrl": "/case-studies/virtual-girlfriend-20260727/pending.svg",
+            "orientation": "landscape"
+          }
+        }
+      ],
+      "currentCharacterState": {
+        "lanjian": "作者锁定角色状态；脸部锚点、年龄、身份与声线不因分支改变。"
+      },
+      "currentVisualStates": {
+        "lanjian": "humanized_homewear"
+      },
+      "currentRoleState": {
+        "sourceMode": "author-locked",
+        "releasePolicy": "public"
+      }
+    }
+  },
+  "assetSummary": {
+    "generated": 8,
+    "pending": 0,
+    "failed": 0,
+    "restricted": 5
+  }
+}

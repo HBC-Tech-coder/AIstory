@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title description">
+  <title id="title">案例画面待生成</title>
+  <description id="description">AIstory 本地案例的图片资产仍在生成队列中</description>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#191715"/>
+      <stop offset="0.58" stop-color="#40372f"/>
+      <stop offset="1" stop-color="#8a5a2b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="70%" cy="30%" r="55%">
+      <stop offset="0" stop-color="#d7b76e" stop-opacity=".24"/>
+      <stop offset="1" stop-color="#d7b76e" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#glow)"/>
+  <path d="M0 690 C290 610 530 730 800 640 S1290 570 1600 650 V900 H0Z" fill="#0e0d0c" opacity=".42"/>
+  <g fill="none" stroke="#d7b76e" stroke-opacity=".28">
+    <path d="M220 170H1380"/>
+    <path d="M220 730H1380"/>
+    <circle cx="800" cy="450" r="176"/>
+    <circle cx="800" cy="450" r="210" stroke-dasharray="7 18"/>
+  </g>
+  <g text-anchor="middle" fill="#f5ead8">
+    <text x="800" y="425" font-size="32" letter-spacing="8" font-family="system-ui, sans-serif">AISTORY ORIGINAL CASE</text>
+    <text x="800" y="492" font-size="58" font-family="serif">她不在出厂设定里</text>
+    <text x="800" y="548" font-size="24" fill="#d7b76e" font-family="system-ui, sans-serif">画面资产待生成 · 剧情可先行体验</text>
+  </g>
+</svg>
