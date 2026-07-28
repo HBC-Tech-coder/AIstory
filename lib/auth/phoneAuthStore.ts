@@ -19,6 +19,7 @@ export type PhoneChallenge = {
   createdAt: number;
   expiresAt: number;
   attempts: number;
+  status?: "pending" | "sent" | "invalidated";
   consumedAt?: number;
 };
 
@@ -136,6 +137,32 @@ export async function createPhoneChallenge(
   });
 }
 
+export async function markPhoneChallengeSent(
+  challengeId: string,
+): Promise<boolean> {
+  return mutate((store) => {
+    const challenge = store.challenges.find(
+      (item) => item.id === challengeId && item.status === "pending",
+    );
+    if (!challenge) return false;
+    challenge.status = "sent";
+    return true;
+  });
+}
+
+export async function invalidatePhoneChallenge(
+  challengeId: string,
+): Promise<void> {
+  await mutate((store) => {
+    const challenge = store.challenges.find(
+      (item) => item.id === challengeId,
+    );
+    if (challenge && !challenge.consumedAt) {
+      challenge.status = "invalidated";
+    }
+  });
+}
+
 export async function listRecentPhoneChallenges(
   phoneHash: string,
   requestIpHash: string,
@@ -166,6 +193,10 @@ export async function verifyAndConsumePhoneChallenge(input: {
       !challenge
       || challenge.consumedAt
       || challenge.attempts >= input.maxAttempts
+      || (
+        challenge.status !== undefined
+        && challenge.status !== "sent"
+      )
     ) return "invalid";
     if (challenge.expiresAt <= input.now) return "expired";
     challenge.attempts += 1;

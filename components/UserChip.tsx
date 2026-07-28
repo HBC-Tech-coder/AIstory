@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { syncOnLogin } from "@/lib/persistence/cloudSync";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { AuthModal } from "@/components/AuthModal";
+import { useI18n } from "@/lib/i18n/client";
 
 type LocalAccount = {
   userId: string;
@@ -16,6 +17,7 @@ type LocalAccount = {
 };
 
 export function UserChip() {
+  const { t } = useI18n();
   const [user, setUser] = useState<User | null>(null);
   const [localAccount, setLocalAccount] = useState<LocalAccount | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -88,10 +90,12 @@ export function UserChip() {
         <button
           type="button"
           onClick={() => setLoginOpen(true)}
-          className="flex items-center gap-1.5 rounded-full border border-cream-50/15 bg-cream-50/[0.06] px-2.5 py-1 text-[10px] text-cream-50/70 transition-colors hover:bg-cream-50/[0.12]"
+          className="flex min-h-8 items-center gap-2 rounded-full border border-cream-50/25 bg-cream-50/[0.1] px-3 py-1.5 text-xs font-medium text-cream-50/90 transition-colors hover:border-cream-50/40 hover:bg-cream-50/[0.16] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(215,183,110,0.65)]"
+          aria-label={t("auth.loginOrRegister")}
+          title={t("auth.loginOrRegister")}
         >
-          <i className="fa-solid fa-mobile-screen-button text-[9px]" />
-          登录
+          <i className="fa-solid fa-mobile-screen-button text-[11px]" />
+          {t("auth.loginOrRegister")}
         </button>
         {loginOpen && (
           <AuthModal

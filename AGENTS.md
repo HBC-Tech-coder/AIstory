@@ -181,6 +181,10 @@ Use pnpm with Node >=22. `pnpm-lock.yaml` is the source of truth; `package-lock.
   expiry, one-time registration grant, signed user sessions, versioned 2x price
   policy, reserve/settle/refund, admin-grant idempotency/audit, anonymous cache
   access, BYOK exemption, and speculative depth-0 hard rejection.
+- `pnpm test:sms-provider`: zero-network Aliyun Dysmsapi V2 adapter coverage,
+  including canonical configuration, domestic-number normalization, redacted
+  diagnostics, provider failure mapping, pending/sent/invalidation
+  compensation, local-mock loopback enforcement, and response/store secrecy.
 - `pnpm test:creator-providers`: creator-module routing, loopback boundaries,
   dynamic ComfyUI image/video workflows, invalid references, and the P1 rule
   that ComfyUI never accepts speculative-prefetch submissions.
@@ -278,6 +282,19 @@ Use `.env.example` as the source of truth. Never commit `.env.local`, API keys, 
   entry. Registration `initial_grant` is globally one-time per account even
   when the price-policy version changes. Browser demo credits are not a formal
   server balance.
+- Phone verification selects `AISTORY_SMS_PROVIDER=aliyun_dysms` only when
+  server-side `ALIBABA_CLOUD_ACCESS_KEY_ID` /
+  `ALIBABA_CLOUD_ACCESS_KEY_SECRET`, `ALIYUN_SMS_SIGN_NAME`, and
+  `ALIYUN_SMS_TEMPLATE_CODE_LOGIN` are all present. Optional canonical settings
+  are `ALIYUN_SMS_REGION`, `ALIYUN_SMS_ENDPOINT`,
+  `ALIYUN_SMS_TEMPLATE_PARAM_CODE_KEY`, and bounded connect/read timeouts. The
+  provider uses the official Dysmsapi 2017-05-25 V2 SDK, treats only
+  `SendSms` Code `OK` as success, does not retry an ambiguous send, accepts
+  domestic `+86` numbers only, and never returns raw provider errors. The OTP
+  challenge is pending before the call and becomes verifiable only after both
+  provider acceptance and durable `sent` marking; every failure invalidates it.
+  Local mock remains loopback-only. Production configuration and a real-message
+  smoke test are deployment gates, not claims made by the code adapter.
 - Before a foreground generation action, UI disclosure must describe the
   capability set and cost-responsibility source without displaying secrets or
   invented prices. Prefetch depth 0 means no speculative request; depth 1 may

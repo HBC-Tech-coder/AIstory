@@ -373,37 +373,31 @@ Dreamy watercolor style with soft tones and nostalgic atmosphere
   // ========== Auth Modal ==========
   auth: {
     steps: {
-      pick: "Login to Continue",
-      email: "Email Login",
-      otp: "Verification Code",
-      phone: "Phone Login",
+      phone: "Phone Login / Sign Up",
     },
 
-    googleLogin: "Continue with Google",
-    githubLogin: "Continue with GitHub",
-    emailLogin: "Email Verification Code",
-    phoneLogin: "Phone Verification Code",
-    or: "or",
-
-    emailPlaceholder: "your@email.com",
-    phonePlaceholder: "Phone number (include country code)",
-    sendCode: "Send Code",
+    loginOrRegister: "Login / Sign Up",
+    phoneLogin: "Phone Login / Sign Up",
+    registrationHint:
+      "A verified unregistered number is registered automatically. The current policy grants 1,000 credits once to a newly registered account.",
+    phonePlaceholder: "Mainland China phone number",
+    sendCode: "Get SMS Code",
     sending: "Sending...",
 
-    codeSent: "Verification code sent to {email}",
     phoneCodeSent: "Verification code sent to {phone}",
     codePlaceholder: "6-digit code",
     verify: "Confirm",
     verifying: "Verifying...",
     resend: "Resend",
 
-    back: "Back",
-
     close: "Close",
-    ariaLabel: "Login",
+    ariaLabel: "Phone login or sign up",
     platformCostTitle: "Platform-credit generation",
     platformCostDetail: "Estimated {credits} credits · pricing {version}. The call starts only after phone verification.",
     localSmsHint: "Local development uses a strict SMS mock; no real SMS is sent when it is unconfigured.",
+    phoneInvalid: "Enter a valid mainland China phone number.",
+    smsRateLimited: "Too many code requests. Please try again later.",
+    smsUnavailable: "SMS is temporarily unavailable. No code was sent.",
   },
 
   // ========== Dialogue History Modal ==========

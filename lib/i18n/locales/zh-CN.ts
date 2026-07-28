@@ -404,46 +404,32 @@ export const zhCN = {
 
   // ========== Auth Modal (AuthModal.tsx) ==========
   auth: {
-    // Steps
     steps: {
-      pick: "登录以继续",
-      email: "邮箱登录",
-      otp: "验证码",
-      phone: "手机号登录",
+      phone: "手机号登录 / 注册",
     },
 
-    // Buttons
-    googleLogin: "Google 登录",
-    githubLogin: "GitHub 登录",
-    emailLogin: "邮箱验证码登录",
-    phoneLogin: "手机号验证码登录",
-    or: "或",
-
-    // Email input
-    emailPlaceholder: "your@email.com",
-    phonePlaceholder: "手机号（支持 +国家码）",
-    sendCode: "发送验证码",
+    loginOrRegister: "登录 / 注册",
+    phoneLogin: "手机号登录 / 注册",
+    registrationHint:
+      "未注册手机号验证成功后将自动注册；首次注册按当前政策赠送 1000 积分，同一账户仅一次。",
+    phonePlaceholder: "中国大陆手机号",
+    sendCode: "获取短信验证码",
     sending: "发送中...",
 
-    // OTP verification
-    codeSent: "验证码已发送至 {email}",
     phoneCodeSent: "验证码已发送至 {phone}",
     codePlaceholder: "6 位验证码",
     verify: "确认",
     verifying: "验证中...",
     resend: "重新发送",
 
-    // Navigation
-    back: "返回",
-
-    // Close
     close: "关闭",
-
-    // Aria labels
-    ariaLabel: "登录",
+    ariaLabel: "手机号登录 / 注册",
     platformCostTitle: "平台积分调用",
     platformCostDetail: "预计 {credits} 积分 · 定价版本 {version}。验证手机号后才会发起调用。",
     localSmsHint: "本地开发使用严格 mock 短信；未配置时不会发送真实短信。",
+    phoneInvalid: "请输入有效的中国大陆手机号。",
+    smsRateLimited: "验证码请求过于频繁，请稍后再试。",
+    smsUnavailable: "短信服务暂时不可用，验证码未发送。",
   },
 
   // ========== Dialogue History Modal ==========

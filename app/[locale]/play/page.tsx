@@ -94,7 +94,7 @@ import type {
 import { coerceOrientation } from "@infiplot/types";
 import { track } from "@/lib/analytics";
 import { AUTH_ENABLED } from "@/lib/supabase/config";
-import { writeResumeSnapshot, consumeResumeSnapshot } from "@/lib/authResume";
+import { consumeResumeSnapshot } from "@/lib/authResume";
 import {
   AuthModal,
   type AuthRequirement,
@@ -127,17 +127,11 @@ async function requestScene(request: SceneRequest): Promise<SceneResponse> {
 }
 
 const MUTED_STORAGE_KEY = "infiplot:muted";
-// One-shot snapshot of in-progress game state, written just before an OAuth
-// full-page redirect (Google/GitHub) so the play page can resume the exact
-// scene/beat after the round-trip. The redirect unmounts the app and destroys
-// the in-memory Session (the server is stateless), so without this the play
-// page re-bootstraps from `?card=…` and restarts the story. OTP login keeps
-// state in-memory (no redirect) and never writes this. Consumed once on mount.
+// Legacy one-shot OAuth resume key. New phone login remains in-page and does
+// not write it; consuming old snapshots preserves upgrade compatibility.
 const PLAY_RESUME_KEY = "infiplot:play-resume";
 
-// Serializable form of the action intercepted by a 401. `persistPlayResume`
-// stashes whichever one is pending into sessionStorage; the deferred-replay
-// effect re-dispatches it after `restorePlayResume` commits the restored state.
+// Serializable legacy action restored from a pre-phone-login snapshot.
 type PendingResumeAction =
   | { kind: "choice"; choice: BeatChoice }
   | { kind: "freeform"; text: string }
@@ -1362,39 +1356,7 @@ function PlayInner() {
     setRoleNotice(safeAlias ? `角色称呼已改为：${safeAlias}` : "已恢复作品原名");
   }, []);
 
-  // Snapshot the in-progress game just before an OAuth full-page redirect so
-  // the play page can resume the exact scene/beat on return. Reads only refs
-  // (stable across renders), so an empty dep list is safe. Mirrors the
-  // homepage's persistPendingStart + quota-fallback degradation.
-  const persistPlayResume = useCallback((): void => {
-    const sess = sessionRef.current;
-    const beat = currentBeatRef.current;
-    const imageOriginalUrl = lastImageOriginalUrlRef.current;
-    if (!sess || !beat || !imageOriginalUrl) return;
-    const snap: PlayResumeSnapshot = {
-      session: sess,
-      beatId: beat.id,
-      visitedBeats: [...visitedBeatsRef.current],
-      orientation: coerceOrientation(sess.orientation),
-      imageOriginalUrl,
-      pendingAction: pendingResumeActionRef.current ?? undefined,
-    };
-    // Quota-safe write: the only heavy field is the user-uploaded style ref
-    // (~100KB data URL), which only affects the Painter on FUTURE scenes, not
-    // the resumed scene — so stripping it degrades gracefully. Voices are
-    // deliberately kept (continuity > rare quota miss; a typical session of
-    // remote-image URLs + a few ~160KB voice refs fits under the 5MB cap).
-    writeResumeSnapshot(PLAY_RESUME_KEY, snap, [
-      // Fallback: drop the style-reference data URL from the session.
-      { ...snap, session: { ...sess, styleReferenceImage: undefined } },
-    ]);
-  }, []);
-
-  // Restore an in-progress game from a PLAY_RESUME_KEY snapshot after an OAuth
-  // round-trip. Re-resolves the remote image URL to a fresh blob (the old blob
-  // was revoked on unmount), repopulates the runtime refs the handlers read,
-  // and hands any pending action to the deferred-replay effect. Throws on a
-  // corrupt snapshot so the caller can fall back to normal bootstrap.
+  // Restore one older in-progress snapshot and replay its pending action.
   const restorePlayResume = useCallback(
     async (snap: PlayResumeSnapshot): Promise<void> => {
       const last = snap.session.history[snap.session.history.length - 1];
@@ -2337,20 +2299,7 @@ function PlayInner() {
     if (startedRef.current) return;
     startedRef.current = true;
 
-    // ── OAuth resume ────────────────────────────────────────────────
-    // Returning from a Google/GitHub round-trip? The full-page redirect
-    // destroyed the in-memory Session; if we stashed a snapshot just before
-    // navigating away (persistPlayResume via AuthModal.onBeforeOAuth) and the
-    // user is now signed in, restore the exact scene/beat instead of
-    // re-bootstrapping from `?card=…` (which would restart the story). OTP
-    // login never writes a snapshot — its onSuccess retry keeps state
-    // in-memory.
-    //
-    // Peek before awaiting: when there's no snapshot (the common case —
-    // normal card/preset/custom entry), fall straight through to the
-    // bootstrap below. Only when a snapshot exists do we enter the async
-    // gate, which itself removes the entry. This keeps the no-snapshot path
-    // off the retryBootstrap re-trigger loop entirely.
+    // Consume a legacy OAuth snapshot when one remains from an older build.
     if (
       AUTH_ENABLED &&
       sessionStorage.getItem(PLAY_RESUME_KEY) !== null
@@ -3911,7 +3860,6 @@ function PlayInner() {
               pendingResumeActionRef.current = null;
               retry?.();
             }}
-            onBeforeOAuth={persistPlayResume}
             requirement={authRequirement}
           />
         )}
@@ -4156,7 +4104,6 @@ function PlayInner() {
             pendingResumeActionRef.current = null;
             retry?.();
           }}
-          onBeforeOAuth={persistPlayResume}
           requirement={authRequirement}
         />
       )}

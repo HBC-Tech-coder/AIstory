@@ -9,9 +9,19 @@ import {
 } from "@/lib/admin/service";
 import {
   createPhoneChallenge,
+  invalidatePhoneChallenge,
   listRecentPhoneChallenges,
+  markPhoneChallengeSent,
   verifyAndConsumePhoneChallenge,
 } from "./phoneAuthStore";
+import { createAliyunSmsProvider } from "./aliyunSmsProvider";
+import {
+  PhoneAuthError,
+  type SmsVerificationProvider,
+} from "./smsProvider";
+
+export { PhoneAuthError };
+export type { SmsVerificationProvider };
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const REQUEST_WINDOW_MS = 60 * 60 * 1000;
@@ -19,31 +29,19 @@ const PHONE_REQUEST_LIMIT = 5;
 const IP_REQUEST_LIMIT = 10;
 const OTP_MAX_ATTEMPTS = 5;
 
-export interface SmsVerificationProvider {
-  readonly id: "local_mock" | "aliyun_dysms";
-  readonly available: boolean;
-  sendVerificationCode(input: {
-    phone: string;
-    code: string;
-    expiresInSeconds: number;
-  }): Promise<void>;
-}
+export type PhoneOtpChallengeStore = {
+  listRecent: typeof listRecentPhoneChallenges;
+  create: typeof createPhoneChallenge;
+  markSent: typeof markPhoneChallengeSent;
+  invalidate: typeof invalidatePhoneChallenge;
+};
 
-export class PhoneAuthError extends Error {
-  constructor(
-    readonly code:
-      | "PHONE_INVALID"
-      | "SMS_PROVIDER_UNAVAILABLE"
-      | "SMS_RATE_LIMITED"
-      | "OTP_INVALID_OR_EXPIRED"
-      | "PHONE_AUTH_NOT_CONFIGURED",
-    readonly status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = "PhoneAuthError";
-  }
-}
+const DEFAULT_CHALLENGE_STORE: PhoneOtpChallengeStore = {
+  listRecent: listRecentPhoneChallenges,
+  create: createPhoneChallenge,
+  markSent: markPhoneChallengeSent,
+  invalidate: invalidatePhoneChallenge,
+};
 
 function requiredSecret(name: string): string {
   const value = process.env[name]?.trim();
@@ -116,6 +114,9 @@ export function resolveSmsProvider(): SmsVerificationProvider {
       },
     };
   }
+  if (process.env.AISTORY_SMS_PROVIDER === "aliyun_dysms") {
+    return createAliyunSmsProvider();
+  }
   return {
     id: "aliyun_dysms",
     available: false,
@@ -141,12 +142,14 @@ export async function requestPhoneOtp(input: {
   ip: string;
   now?: number;
   provider?: SmsVerificationProvider;
+  challengeStore?: PhoneOtpChallengeStore;
 }): Promise<{ challengeId: string; maskedPhone: string; expiresInSeconds: number }> {
   const now = input.now ?? Date.now();
+  const challengeStore = input.challengeStore ?? DEFAULT_CHALLENGE_STORE;
   const normalized = normalizePhone(input.phone);
   const identity = phoneIdentity(normalized);
   const ipHash = requestIpHash(input.ip);
-  const recent = await listRecentPhoneChallenges(
+  const recent = await challengeStore.listRecent(
     identity.phoneHash,
     ipHash,
     now - REQUEST_WINDOW_MS,
@@ -177,7 +180,7 @@ export async function requestPhoneOtp(input: {
   }
   const challengeId = randomUUID();
   const code = createOtpCode(provider);
-  await createPhoneChallenge({
+  await challengeStore.create({
     id: challengeId,
     phoneHash: identity.phoneHash,
     maskedPhone: identity.maskedPhone,
@@ -186,12 +189,30 @@ export async function requestPhoneOtp(input: {
     createdAt: now,
     expiresAt: now + OTP_TTL_MS,
     attempts: 0,
+    status: "pending",
   });
-  await provider.sendVerificationCode({
-    phone: normalized,
-    code,
-    expiresInSeconds: OTP_TTL_MS / 1000,
-  });
+  try {
+    await provider.sendVerificationCode({
+      phone: normalized,
+      code,
+      expiresInSeconds: OTP_TTL_MS / 1000,
+    });
+    if (!await challengeStore.markSent(challengeId)) {
+      throw new PhoneAuthError(
+        "SMS_PROVIDER_UNAVAILABLE",
+        503,
+        "短信服务暂时不可用，请稍后再试。",
+      );
+    }
+  } catch (error) {
+    await challengeStore.invalidate(challengeId).catch(() => undefined);
+    if (error instanceof PhoneAuthError) throw error;
+    throw new PhoneAuthError(
+      "SMS_PROVIDER_UNAVAILABLE",
+      503,
+      "短信服务暂时不可用，请稍后再试。",
+    );
+  }
   return {
     challengeId,
     maskedPhone: identity.maskedPhone,

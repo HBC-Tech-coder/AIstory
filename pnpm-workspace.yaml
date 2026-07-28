@@ -2,6 +2,7 @@ packages:
   - "."
 
 allowBuilds:
+  '@alicloud/openapi-core': true
   '@fortawesome/fontawesome-free': true
   esbuild: true
   sharp: true

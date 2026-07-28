@@ -67,6 +67,7 @@ users.md
 # Local source material, review renders, and generated delivery packages stay
 # off GitHub. Runtime-safe derived case assets live under public/case-studies.
 content
+/Downloads/
 /docs
 experiments
 

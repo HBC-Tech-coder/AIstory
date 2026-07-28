@@ -13,7 +13,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint components/CreatorStudioShell.tsx components/CreatorProjectContextPanel.tsx components/LocalGenerationPanel.tsx components/CaseAssetReviewPanel.tsx components/AuthModal.tsx components/UserChip.tsx components/CreditBalance.tsx components/MobileDreamFrameApp.tsx lib/creator-studio lib/localminidrama lib/providers lib/generation-jobs lib/project-assets lib/case-studies lib/featuredStories.ts lib/security/localMutation.ts lib/auth lib/billing lib/admin lib/credentials app/api/localminidrama app/api/providers app/api/generation-jobs app/api/project-assets app/api/case-studies app/api/auth app/api/account app/api/admin scripts/test-localminidrama-typed-bridge.ts scripts/test-local-generation-jobs.ts scripts/test-project-assets.ts scripts/test-project-asset-continuity.ts scripts/test-studio-generation-engine-selector.ts scripts/test-volcengine-agent-plan.ts scripts/test-case-study-schema.ts scripts/test-case-asset-review.ts scripts/test-author-locked-case-study.ts scripts/test-author-locked-v1.1-delivery.ts scripts/test-account-billing.ts scripts/import-virtual-girlfriend-case.ts next.config.ts",
+    "lint": "eslint components/CreatorStudioShell.tsx components/CreatorProjectContextPanel.tsx components/LocalGenerationPanel.tsx components/CaseAssetReviewPanel.tsx components/AuthModal.tsx components/UserChip.tsx components/CreditBalance.tsx components/MobileDreamFrameApp.tsx lib/creator-studio lib/localminidrama lib/providers lib/generation-jobs lib/project-assets lib/case-studies lib/featuredStories.ts lib/security/localMutation.ts lib/auth lib/billing lib/admin lib/credentials app/api/localminidrama app/api/providers app/api/generation-jobs app/api/project-assets app/api/case-studies app/api/auth app/api/account app/api/admin scripts/test-localminidrama-typed-bridge.ts scripts/test-local-generation-jobs.ts scripts/test-project-assets.ts scripts/test-project-asset-continuity.ts scripts/test-studio-generation-engine-selector.ts scripts/test-volcengine-agent-plan.ts scripts/test-case-study-schema.ts scripts/test-case-asset-review.ts scripts/test-author-locked-case-study.ts scripts/test-author-locked-v1.1-delivery.ts scripts/test-account-billing.ts scripts/test-aliyun-sms-provider.ts scripts/import-virtual-girlfriend-case.ts next.config.ts",
     "lint:full": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test:speculative-cache": "tsx scripts/test-speculative-branch-cache.ts",
@@ -39,6 +39,8 @@
     "test:byok-p2": "tsx scripts/test-byok-external-p2.ts",
     "test:usage-disclosure": "tsx scripts/test-usage-disclosure.ts",
     "test:account-billing": "cross-env NODE_OPTIONS=--conditions=react-server tsx scripts/test-account-billing.ts",
+    "test:sms-provider": "cross-env NODE_OPTIONS=--conditions=react-server tsx scripts/test-aliyun-sms-provider.ts",
+    "test:character-reference-photo": "tsx scripts/test-character-reference-photo.ts",
     "enrich:firstacts": "node scripts/enrich-firstacts-stepfun.mjs",
     "build:cf": "cross-env BUILD_STANDALONE=true next build --webpack && opennextjs-cloudflare build --skipNextBuild",
     "preview:cf": "opennextjs-cloudflare preview",
@@ -46,6 +48,10 @@
     "audit:ai-lover-config": "node scripts/audit-ai-lover-config.mjs"
   },
   "dependencies": {
+    "@alicloud/credentials": "2.4.5",
+    "@alicloud/dysmsapi20170525": "4.6.0",
+    "@alicloud/openapi-client": "0.4.15",
+    "@alicloud/tea-util": "1.4.11",
     "@fortawesome/fontawesome-free": "6.5.1",
     "@supabase/ssr": "^0.12",
     "@supabase/supabase-js": "^2.108",

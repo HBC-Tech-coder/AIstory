@@ -404,46 +404,32 @@ export const ja = {
 
   // ========== Auth Modal (AuthModal.tsx) ==========
   auth: {
-    // Steps
     steps: {
-      pick: "ログインして続行",
-      email: "メールアドレスでログイン",
-      otp: "認証コード",
-      phone: "電話番号でログイン",
+      phone: "電話番号でログイン / 登録",
     },
 
-    // Buttons
-    googleLogin: "Google ログイン",
-    githubLogin: "GitHubでログイン",
-    emailLogin: "メール認証コードでログイン",
-    phoneLogin: "電話番号の認証コード",
-    or: "または",
-
-    // Email input
-    emailPlaceholder: "your@email.com",
-    phonePlaceholder: "電話番号（国番号を含む）",
-    sendCode: "認証コードを送信",
+    loginOrRegister: "ログイン / 登録",
+    phoneLogin: "電話番号でログイン / 登録",
+    registrationHint:
+      "未登録の番号は認証後に自動登録されます。初回登録時は現行ポリシーに基づき、同一アカウントへ一度だけ1,000クレジットを付与します。",
+    phonePlaceholder: "中国本土の携帯電話番号",
+    sendCode: "SMS認証コードを取得",
     sending: "送信中...",
 
-    // OTP verification
-    codeSent: "認証コードを{email}に送信しました",
     phoneCodeSent: "認証コードを{phone}に送信しました",
     codePlaceholder: "6桁の認証コード",
     verify: "確認",
     verifying: "検証中...",
     resend: "再送信",
 
-    // Navigation
-    back: "戻る",
-
-    // Close
     close: "閉じる",
-
-    // Aria labels
-    ariaLabel: "ログイン",
+    ariaLabel: "電話番号でログインまたは登録",
     platformCostTitle: "プラットフォームクレジット生成",
     platformCostDetail: "見積 {credits} クレジット・料金版 {version}。電話番号確認後にのみ実行します。",
     localSmsHint: "ローカル開発は厳格なSMSモックを使用し、未設定時は実SMSを送信しません。",
+    phoneInvalid: "有効な中国本土の携帯電話番号を入力してください。",
+    smsRateLimited: "認証コードの要求が多すぎます。しばらくしてから再試行してください。",
+    smsUnavailable: "SMSサービスは一時的に利用できません。認証コードは送信されていません。",
   },
 
   // ========== Dialogue History Modal ==========
