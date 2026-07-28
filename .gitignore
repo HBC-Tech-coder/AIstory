@@ -1,0 +1,97 @@
+node_modules
+.pnpm-store
+.next
+dist
+build
+out
+*.tsbuildinfo
+
+.env
+.env.local
+.env.*.local
+
+.vercel
+.turbo
+.claude
+.chrome-headless
+.codex-logs
+.logs
+.tmp
+tmp
+logs
+pids
+.aistory-cache
+.aistory-cache-test-tts*
+.aistory-admin
+.aistory-accounts
+.aistory-comfyui
+.aistory-jobs
+.aistory-assets
+.test-asset-continuity-*
+.test-project-assets-*
+
+.open-next
+.wrangler
+.opendeploy
+
+.DS_Store
+*.log
+npm-debug.log*
+pnpm-debug.log*
+*.bak
+*.backup
+*.corrupted-*
+__pycache__/
+*.pyc
+
+repomix-output.xml
+
+users.md
+.dev.vars
+
+# Upstream/donor contribution files have not been rewritten for AIstory.
+/README.en.md
+/README.ja.md
+/CLA.md
+/CLA.zh.md
+/CONTRIBUTING.md
+/AISTORY_MIGRATION.md
+/CLAUDE.md
+/best_practices.md
+/.pr_agent.toml
+/.github/PULL_REQUEST_TEMPLATE.md
+/.github/workflows/cla.yml
+/.github/workflows/docker.yml
+/.github/workflows/pr-agent.yml
+
+# Local source material, review renders, and generated delivery packages stay
+# off GitHub. Runtime-safe derived case assets live under public/case-studies.
+content
+/docs
+experiments
+
+# Local model/workflow archives can be many gigabytes and are never source.
+/*.rar
+/*.7z
+/*.zip
+
+# Local documentation and case-content builders embed workstation paths or
+# source-only material. They remain on disk but are not part of the app source.
+/scripts/build-dreamframe-project-document.py
+/scripts/build_daily_doubao_video_prompt_doc.py
+/scripts/build_dreamframe_aistory_v02_mobile_ui_doc.py
+/scripts/build_dreamframe_aistory_v03_pc_ui_doc.py
+/scripts/build_dreamframe_aistory_v06_localminidrama_doc.py
+/scripts/build_dreamframe_aistory_v07_internal_mvp_doc.py
+/scripts/build_dreamframe_aistory_v08_current_4200_doc.py
+/scripts/build_dreamframe_aistory_v09_character_continuity_doc.py
+/scripts/build_mobile_ui_mockups.py
+/scripts/build_virtual_girlfriend_author_locked_v11.py
+
+pitch/
+
+# OpenDeploy-only build with hardcoded public proxy URL — local, never commit
+# (a public fork would route image traffic through our Cloudflare Worker).
+Dockerfile.opendeploy
+
+piolium/

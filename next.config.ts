@@ -1,0 +1,24 @@
+import type { NextConfig } from "next";
+
+const config: NextConfig = {
+  output: process.env.BUILD_STANDALONE === "true" ? "standalone" : undefined,
+  allowedDevOrigins: ["localhost", "127.0.0.1", "192.168.3.11", "192.168.110.254"],
+  reactStrictMode: true,
+  typedRoutes: false,
+  turbopack: {
+    root: __dirname,
+  },
+  // /public defaults to `max-age=0, must-revalidate`; pin the stable /home/* covers + first-act JSON for 1y so browsers/CDN stop re-downloading them.
+  async headers() {
+    return [
+      {
+        source: "/home/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+    ];
+  },
+};
+
+export default config;
