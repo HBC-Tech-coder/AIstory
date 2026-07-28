@@ -64,6 +64,14 @@ InfiPlot is a Next.js 16 / React 19 / TypeScript app for AI-driven interactive v
   gate. Anonymous users may read published/cached content, but a platform-paid
   cache miss must quote, authenticate, reserve immutable credits, then settle
   or refund. Local SMS is a loopback-only mock and never sends a real message.
+- `lib/production/databaseGate.ts`,
+  `supabase/migrations/20260729093000_production_identity_billing_gate.sql`:
+  production phone identities use stable application UUIDs mapped from a
+  phone HMAC. Real SMS and formal credits require the explicit Supabase
+  repository configuration plus the exact database-owned gate version.
+  Registration, initial grant, administrator credit adjustments, billing
+  terminals, and production administrator mutations use allowlisted
+  security-definer RPCs so business state and audit commit together.
 
 For engine work, read `lib/types/index.ts`, the target agent/orchestrator file, and the API route exposing the behavior. For UI work, inspect the component and the owning page.
 
@@ -185,6 +193,10 @@ Use pnpm with Node >=22. `pnpm-lock.yaml` is the source of truth; `package-lock.
   including canonical configuration, domestic-number normalization, redacted
   diagnostics, provider failure mapping, pending/sent/invalidation
   compensation, local-mock loopback enforcement, and response/store secrecy.
+- `pnpm test:production-db-gate`: static forward-migration/RLS/RPC contract,
+  UUID phone-session compatibility, production fail-closed behavior,
+  redacted RPC payloads, and atomic/idempotent administrator mutation
+  coverage. It does not apply the migration or claim a real Postgres run.
 - `pnpm test:creator-providers`: creator-module routing, loopback boundaries,
   dynamic ComfyUI image/video workflows, invalid references, and the P1 rule
   that ComfyUI never accepts speculative-prefetch submissions.
@@ -282,6 +294,20 @@ Use `.env.example` as the source of truth. Never commit `.env.local`, API keys, 
   entry. Registration `initial_grant` is globally one-time per account even
   when the price-policy version changes. Browser demo credits are not a formal
   server balance.
+- Production phone identity and billing additionally require
+  `AISTORY_PRODUCTION_IDENTITY_ENABLED=true`,
+  `AISTORY_IDENTITY_REPOSITORY=supabase`,
+  `AISTORY_ADMIN_REPOSITORY=supabase`, and
+  `AISTORY_DATABASE_GATE_VERSION=20260729093000`, together with the Supabase
+  URL and service-role secret. The server verifies the same version through a
+  database RPC before sending real SMS or quoting/reserving formal credits.
+  An env version alone never proves that a migration was applied. Legacy
+  `phone_<hash>` sessions are local-mock-only; production phone cookies carry
+  a stable UUID.
+- Production administrator actors are bound to the Supabase repository only
+  after the same environment and database-owned gate check. They never fall
+  back to `.aistory-admin`; loopback local actors remain explicitly bound to
+  the local development repository.
 - Phone verification selects `AISTORY_SMS_PROVIDER=aliyun_dysms` only when
   server-side `ALIBABA_CLOUD_ACCESS_KEY_ID` /
   `ALIBABA_CLOUD_ACCESS_KEY_SECRET`, `ALIYUN_SMS_SIGN_NAME`, and

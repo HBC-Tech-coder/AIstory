@@ -5,6 +5,7 @@ import {
   requestPhoneOtp,
   resolveSmsProvider,
 } from "@/lib/auth/phoneAuthService";
+import { ProductionDatabaseGateError } from "@/lib/production/databaseGate";
 import { isTrustedLoopbackMutationRequest } from "@/lib/security/localMutation";
 
 export const runtime = "nodejs";
@@ -54,6 +55,12 @@ export async function POST(request: Request): Promise<Response> {
       { status: 202 },
     );
   } catch (error) {
+    if (error instanceof ProductionDatabaseGateError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
+    }
     if (error instanceof PhoneAuthError) {
       return NextResponse.json(
         { error: error.message, code: error.code },

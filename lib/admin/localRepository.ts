@@ -3,7 +3,12 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { AdminRepository } from "./repositories";
+import type {
+  AdminRepository,
+  AtomicAdminMutation,
+  AtomicCreditAdjustmentInput,
+  AtomicCreditAdjustmentResult,
+} from "./repositories";
 import type {
   AdminActor,
   AdminAuditLog,
@@ -273,6 +278,129 @@ export class LocalAdminRepository implements AdminRepository {
       store.creditLedger.push(entry);
     });
     return result;
+  }
+
+  async adjustCreditsAtomically(
+    input: AtomicCreditAdjustmentInput,
+  ): Promise<AtomicCreditAdjustmentResult> {
+    let result: AtomicCreditAdjustmentResult | undefined;
+    await this.update((store) => {
+      const existing = store.creditLedger.find(
+        (item) => item.tenantId === input.tenantId
+          && item.idempotencyKey === input.idempotencyKey,
+      );
+      const balance = store.creditLedger
+        .filter((item) =>
+          item.tenantId === input.tenantId
+          && item.userId === input.userId
+        )
+        .reduce((sum, item) => sum + item.amount, 0);
+      if (existing) {
+        if (
+          existing.userId !== input.userId
+          || existing.tenantId !== input.tenantId
+          || existing.amount !== input.amount
+          || existing.reason !== input.reason
+          || existing.actorId !== input.actor.userId
+          || existing.kind !== "manual_adjustment"
+        ) {
+          throw new Error("Credit adjustment idempotency conflict.");
+        }
+        const originalAudit = store.auditLogs.find(
+          (item) =>
+            item.action === "credit.manual_adjustment"
+            && item.afterSummary?.entryId === existing.id,
+        );
+        const originalBefore = originalAudit?.beforeSummary?.balance;
+        const originalAfter = originalAudit?.afterSummary?.balance;
+        if (
+          typeof originalBefore !== "number"
+          || typeof originalAfter !== "number"
+        ) {
+          throw new Error("Credit adjustment audit is unavailable.");
+        }
+        result = {
+          entry: existing,
+          balanceBefore: originalBefore,
+          balanceAfter: originalAfter,
+          replayed: true,
+        };
+        return;
+      }
+      const user = store.users.find(
+        (item) =>
+          item.userId === input.userId && item.tenantId === input.tenantId,
+      );
+      if (!user) throw new Error("用户不存在");
+      let account = store.creditAccounts.find(
+        (item) =>
+          item.userId === input.userId
+          && item.tenantId === input.tenantId
+          && item.currency === "credit",
+      );
+      if (!account) {
+        account = {
+          id: randomUUID(),
+          tenantId: input.tenantId,
+          userId: input.userId,
+          currency: "credit",
+          createdAt: input.createdAt,
+        };
+        store.creditAccounts.push(account);
+      }
+      const entry: ServerCreditLedgerEntry = {
+        id: input.entryId,
+        accountId: account.id,
+        tenantId: input.tenantId,
+        userId: input.userId,
+        kind: "manual_adjustment",
+        amount: input.amount,
+        reason: input.reason,
+        idempotencyKey: input.idempotencyKey,
+        actorId: input.actor.userId,
+        createdAt: input.createdAt,
+      };
+      const auditLog: AdminAuditLog = {
+        id: input.auditId,
+        tenantId: input.tenantId,
+        actorId: input.actor.userId,
+        actorRoles: input.actor.roles,
+        action: "credit.manual_adjustment",
+        targetType: "credit_account",
+        targetId: account.id,
+        beforeSummary: { userId: input.userId, balance },
+        afterSummary: {
+          userId: input.userId,
+          amount: input.amount,
+          entryId: entry.id,
+          balance: balance + input.amount,
+        },
+        reason: input.reason,
+        requestId: input.requestId,
+        createdAt: input.createdAt,
+      };
+      store.creditLedger.push(entry);
+      store.auditLogs.push(auditLog);
+      result = {
+        entry,
+        balanceBefore: balance,
+        balanceAfter: balance + input.amount,
+        replayed: false,
+      };
+    });
+    if (!result) throw new Error("积分调整未完成");
+    return result;
+  }
+
+  async applyAdminMutationAtomically(
+    _mutation: AtomicAdminMutation,
+    _audit: AdminAuditLog,
+  ): Promise<void> {
+    void _mutation;
+    void _audit;
+    throw new Error(
+      "Local admin mutations use the local repository transaction methods.",
+    );
   }
 
   async appendEvent(event: GameplayEvent): Promise<void> {

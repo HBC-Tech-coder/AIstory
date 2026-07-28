@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/admin/security";
-import { getAdminRepository } from "@/lib/admin/service";
+import { getAdminRepositoryForActor } from "@/lib/admin/service";
 import {
   configureComfyUIWorkflowTemplate,
   dryValidateComfyUIWorkflowImport,
@@ -28,12 +28,29 @@ type WorkflowAdminAction =
 export async function GET(): Promise<Response> {
   const actor = await requireAdmin(["super_admin", "ops"]);
   if (actor instanceof NextResponse) return actor;
-  return NextResponse.json({ templates: await listComfyUIWorkflowTemplates() });
+  try {
+    await getAdminRepositoryForActor(actor);
+    return NextResponse.json({ templates: await listComfyUIWorkflowTemplates() });
+  } catch {
+    return NextResponse.json(
+      { error: "Administrator repository is unavailable." },
+      { status: 503 },
+    );
+  }
 }
 
 export async function POST(request: Request): Promise<Response> {
   const actor = await requireAdmin(["super_admin", "ops"]);
   if (actor instanceof NextResponse) return actor;
+  // The workflow registry is a local filesystem control plane. It cannot be
+  // transactionally coupled to production database audit records, so P1
+  // permits mutations only through the loopback local-admin mode.
+  if (actor.mode !== "local") {
+    return NextResponse.json(
+      { error: "Production workflow mutation is not available." },
+      { status: 503 },
+    );
+  }
   try {
     assertTrustedLoopbackMutation(request);
     const body = (await request.json()) as WorkflowAdminAction;
@@ -57,7 +74,8 @@ export async function POST(request: Request): Promise<Response> {
     if (!result) {
       return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
     }
-    await getAdminRepository().appendAudit({
+    const localRepository = await getAdminRepositoryForActor(actor);
+    await localRepository.appendAudit({
       id: randomUUID(),
       tenantId: "platform",
       actorId: actor.userId,

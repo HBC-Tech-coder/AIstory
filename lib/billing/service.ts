@@ -146,6 +146,9 @@ export async function reservePlatformOperation(
     await quotePlatformOperation(repository, input.operation);
   let account = await repository.getAccount(input.userId, TENANT_ID);
   if (!account) {
+    if (repository.source === "supabase") {
+      throw new Error("ACCOUNT_UNAVAILABLE");
+    }
     account = {
       id: randomUUID(),
       tenantId: TENANT_ID,

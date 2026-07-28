@@ -8,11 +8,22 @@ import {
   localSecretMatches,
   resolveAdminActor,
 } from "@/lib/admin/security";
+import { getAdminRepositoryForActor } from "@/lib/admin/service";
 
 export const runtime = "nodejs";
 
 export async function GET(): Promise<Response> {
   const actor = await resolveAdminActor();
+  if (actor) {
+    try {
+      await getAdminRepositoryForActor(actor);
+    } catch {
+      return NextResponse.json(
+        { error: "Administrator repository is unavailable." },
+        { status: 503 },
+      );
+    }
+  }
   return NextResponse.json({
     authenticated: !!actor,
     mode: actor?.mode,
