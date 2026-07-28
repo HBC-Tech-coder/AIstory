@@ -172,7 +172,8 @@ export const zhCN = {
         const authHint = params.authEnabled ? '（测试期间，登录即可免费畅玩）' : '';
         return `输入想法、配置风格，点击「开始」即可游玩${authHint}；也可以从下方精选故事集挑一篇快速体验 <em class="not-italic text-ember-500">AIstory</em>。点击「<span class="inline-flex items-center gap-1 text-ember-500"><i class="fa-solid fa-gear text-[10px]"></i>设置</span>」还能填入你的名字，以及你自己的文本、绘图、识图模型和配音 Key——全部只存在本地浏览器，体验更稳定。`;
       },
-      closeAriaLabel: "不再显示此提示",
+      collapseAriaLabel: "收起使用说明",
+      expand: "展开使用说明",
     },
 
     // About section

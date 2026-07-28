@@ -172,7 +172,8 @@ export const ja = {
         const authHint = params.authEnabled ? '（テスト期間中、ログインするだけで無料でプレイできます）' : '';
         return `アイデアを入力し、スタイルを設定して、「開始」をクリックするだけでプレイできます${authHint}。また、下の厳選ストーリー集から1つ選んで、すぐに <em class="not-italic text-ember-500">AIstory</em> を体験することもできます。「<span class="inline-flex items-center gap-1 text-ember-500"><i class="fa-solid fa-gear text-[10px]"></i>設定</span>」をクリックすると、あなたの名前や、ご自身のテキスト、画像生成、画像認識モデル、そしてボイス Key を入力することもできます。これらはすべてローカルブラウザにのみ保存されるため、より安定して体験できます。`;
       },
-      closeAriaLabel: "今後このメッセージを表示しない",
+      collapseAriaLabel: "使い方ガイドを折りたたむ",
+      expand: "使い方ガイドを表示",
     },
 
     // About section

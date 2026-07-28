@@ -158,7 +158,8 @@ Dreamy watercolor style with soft tones and nostalgic atmosphere
         const authHint = params.authEnabled ? ' (login required during beta, free to play)' : '';
         return `Enter your ideas, configure styles, and click "Start" to play${authHint}. You can also pick a curated story from below to quickly experience <em class="not-italic text-ember-500">AIstory</em>. Click "<span class="inline-flex items-center gap-1 text-ember-500"><i class="fa-solid fa-gear text-[10px]"></i>Settings</span>" to enter your name and configure your own text, image, vision models and TTS keys—all stored locally in your browser for a more stable experience.`;
       },
-      closeAriaLabel: "Don't show this hint again",
+      collapseAriaLabel: "Collapse usage guide",
+      expand: "Show usage guide",
     },
 
     about: {

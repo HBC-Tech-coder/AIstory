@@ -952,7 +952,7 @@ export default function HomePage() {
   const [imageStoryLoading, setImageStoryLoading] = useState(false);
   const [imageStoryError, setImageStoryError] = useState<string | null>(null);
 
-  // 顶部使用提示：默认展示，用户可点 × 永久关闭（localStorage:infiplot:hintClosed）。
+  // 顶部使用说明默认展开；用户可收起，并随时从信息卡内恢复。
   const [hintClosed, setHintClosed] = useState(false);
 
   // 统一设置弹窗（通用 + 模型）：可选增强，数据只存浏览器。
@@ -1117,6 +1117,15 @@ export default function HomePage() {
     setHintClosed(true);
     try {
       localStorage.setItem("infiplot:hintClosed", "1");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const openHint = () => {
+    setHintClosed(false);
+    try {
+      localStorage.removeItem("infiplot:hintClosed");
     } catch {
       /* ignore */
     }
@@ -1728,7 +1737,8 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={closeHint}
-                  aria-label={t("home.hint.closeAriaLabel")}
+                  aria-label={t("home.hint.collapseAriaLabel")}
+                  title={t("home.hint.collapseAriaLabel")}
                   className="absolute right-3 top-3 inline-flex h-6 w-6 items-center justify-center rounded-full text-clay-400 transition-colors hover:bg-clay-900/5 hover:text-clay-700"
                 >
                   <i className="fa-solid fa-xmark text-xs" />
@@ -1743,8 +1753,18 @@ export default function HomePage() {
                 prefetchDepth={branchPrefetchDepth}
                 refreshKey={settingsOpen}
                 variant="plain"
-                className="pr-6 text-xs leading-relaxed text-clay-600"
+                className="text-xs leading-relaxed text-clay-600"
               />
+              {hintClosed && (
+                <button
+                  type="button"
+                  onClick={openHint}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-clay-900/10 bg-cream-50/70 px-3 py-1.5 text-xs font-medium text-clay-700 transition-colors hover:border-clay-900/20 hover:bg-cream-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember-500/50"
+                >
+                  <i className="fa-solid fa-chevron-down text-[10px]" aria-hidden="true" />
+                  {t("home.hint.expand")}
+                </button>
+              )}
             </div>
 
             {!hintClosed && (
