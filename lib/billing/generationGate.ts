@@ -17,6 +17,10 @@ import {
   authorizeCredentialAccess,
   type CredentialAccessDecision,
 } from "@/lib/credentials/serverPolicy";
+import {
+  assertProductionDatabaseGateReady,
+  ProductionDatabaseGateError,
+} from "@/lib/production/databaseGate";
 
 type AuthIdentity = {
   userId: string;
@@ -65,13 +69,17 @@ export async function prepareGenerationBilling(input: {
   if (!decision.allowed) {
     if (decision.code === "PHONE_VERIFICATION_REQUIRED") {
       try {
+        await assertProductionDatabaseGateReady("billing");
         const quote = await quotePlatformOperation(
           getAdminRepository(),
           input.operation,
         );
         return accessResponse(decision, quote.publicQuote);
       } catch (error) {
-        if (error instanceof PricingUnavailableError) {
+        if (
+          error instanceof PricingUnavailableError
+          || error instanceof ProductionDatabaseGateError
+        ) {
           return NextResponse.json(
             { error: error.message, code: error.code },
             { status: error.status },
@@ -84,6 +92,7 @@ export async function prepareGenerationBilling(input: {
   }
   if (decision.mode === "user_byok") return { mode: "user_byok" };
   try {
+    await assertProductionDatabaseGateReady("billing");
     const reservation = await reservePlatformOperation(
       getAdminRepository(),
       {
@@ -97,6 +106,7 @@ export async function prepareGenerationBilling(input: {
     if (
       error instanceof PricingUnavailableError
       || error instanceof InsufficientCreditsError
+      || error instanceof ProductionDatabaseGateError
     ) {
       return NextResponse.json(
         {

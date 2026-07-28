@@ -6,6 +6,10 @@ import {
   userSessionCookieOptions,
 } from "@/lib/auth/userSession";
 import { requireUser } from "@/lib/supabase/guard";
+import {
+  assertProductionDatabaseGate,
+  ProductionDatabaseGateError,
+} from "@/lib/production/databaseGate";
 
 export const runtime = "nodejs";
 
@@ -18,27 +22,46 @@ export async function GET(): Promise<Response> {
       account: null,
     });
   }
-  const repository = getAdminRepository();
-  const user = await repository.getUser(auth.userId);
-  const ledger = await repository.listLedger(auth.userId);
-  return NextResponse.json({
-    authenticated: true,
-    account: {
-      userId: auth.userId,
-      authType: auth.authType,
-      displayName: user?.displayName || "AIstory 用户",
-      maskedContact: user?.maskedContact,
-      status: user?.status || "active",
-      balance: ledger.reduce((sum, entry) => sum + entry.amount, 0),
-      ledger: ledger.slice(-20).reverse().map((entry) => ({
-        id: entry.id,
-        kind: entry.kind,
-        amount: entry.amount,
-        reason: entry.reason,
-        createdAt: entry.createdAt,
-      })),
-    },
-  });
+  try {
+    if (
+      auth.authType === "phone"
+      && process.env.AISTORY_IDENTITY_REPOSITORY === "supabase"
+    ) {
+      assertProductionDatabaseGate("identity");
+    }
+    const repository = getAdminRepository();
+    const user = await repository.getUser(auth.userId);
+    const ledger = await repository.listLedger(auth.userId);
+    return NextResponse.json({
+      authenticated: true,
+      account: {
+        userId: auth.userId,
+        authType: auth.authType,
+        displayName: user?.displayName || "AIstory 用户",
+        maskedContact: user?.maskedContact,
+        status: user?.status || "active",
+        balance: ledger.reduce((sum, entry) => sum + entry.amount, 0),
+        ledger: ledger.slice(-20).reverse().map((entry) => ({
+          id: entry.id,
+          kind: entry.kind,
+          amount: entry.amount,
+          reason: entry.reason,
+          createdAt: entry.createdAt,
+        })),
+      },
+    });
+  } catch (error) {
+    const status = error instanceof ProductionDatabaseGateError
+      ? error.status
+      : 503;
+    return NextResponse.json(
+      {
+        error: "账户数据暂时不可用。",
+        code: "ACCOUNT_REPOSITORY_UNAVAILABLE",
+      },
+      { status },
+    );
+  }
 }
 
 export async function DELETE(): Promise<Response> {

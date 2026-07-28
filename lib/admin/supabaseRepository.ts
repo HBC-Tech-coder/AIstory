@@ -4,7 +4,12 @@ import {
   createClient,
   type SupabaseClient,
 } from "@supabase/supabase-js";
-import type { AdminRepository } from "./repositories";
+import type {
+  AdminRepository,
+  AtomicAdminMutation,
+  AtomicCreditAdjustmentInput,
+  AtomicCreditAdjustmentResult,
+} from "./repositories";
 import type {
   AdminActor,
   AdminAuditLog,
@@ -22,6 +27,10 @@ import type {
   UserProjection,
   UserRoleRecord,
 } from "./types";
+import {
+  assertProductionDatabaseGate,
+  ProductionDatabaseGateError,
+} from "@/lib/production/databaseGate";
 
 type DbRow = Record<string, unknown>;
 
@@ -67,7 +76,7 @@ async function rows(
   promise: PromiseLike<{ data: unknown; error: { message: string } | null }>,
 ): Promise<DbRow[]> {
   const result = await promise;
-  if (result.error) throw new Error(result.error.message);
+  if (result.error) throw new ProductionDatabaseGateError();
   return Array.isArray(result.data) ? result.data as DbRow[] : [];
 }
 
@@ -75,7 +84,7 @@ async function write(
   promise: PromiseLike<{ error: { message: string } | null }>,
 ): Promise<void> {
   const result = await promise;
-  if (result.error) throw new Error(result.error.message);
+  if (result.error) throw new ProductionDatabaseGateError();
 }
 
 export class SupabaseAdminRepository implements AdminRepository {
@@ -109,21 +118,9 @@ export class SupabaseAdminRepository implements AdminRepository {
     return (await this.listUsers()).find((user) => user.userId === userId);
   }
 
-  async saveUser(user: UserProjection): Promise<void> {
-    await write(this.client.from("profiles").upsert({
-      user_id: user.userId,
-      tenant_id: user.tenantId,
-      channel_id: user.channelId,
-      display_name: user.displayName,
-      masked_contact: user.maskedContact,
-      status: user.status,
-      user_type: user.userType,
-      locale: user.locale,
-      region: user.region,
-      tags: user.tags,
-      created_at: user.createdAt,
-      last_seen_at: user.lastSeenAt,
-    }));
+  async saveUser(_user: UserProjection): Promise<void> {
+    void _user;
+    throw new Error("Use the transactional production admin mutation RPC.");
   }
 
   async listRoles(userId?: string): Promise<UserRoleRecord[]> {
@@ -139,14 +136,9 @@ export class SupabaseAdminRepository implements AdminRepository {
     }));
   }
 
-  async addRole(role: UserRoleRecord): Promise<void> {
-    await write(this.client.from("user_roles").upsert({
-      user_id: role.userId,
-      tenant_id: role.tenantId,
-      role: role.role,
-      created_at: role.createdAt,
-      created_by: role.createdBy,
-    }));
+  async addRole(_role: UserRoleRecord): Promise<void> {
+    void _role;
+    throw new Error("Use the transactional production admin mutation RPC.");
   }
 
   async getAccount(
@@ -171,14 +163,9 @@ export class SupabaseAdminRepository implements AdminRepository {
     } : undefined;
   }
 
-  async createAccount(account: CreditAccount): Promise<void> {
-    await write(this.client.from("credit_accounts").upsert({
-      id: account.id,
-      tenant_id: account.tenantId,
-      user_id: account.userId,
-      currency: account.currency,
-      created_at: account.createdAt,
-    }));
+  async createAccount(_account: CreditAccount): Promise<void> {
+    void _account;
+    throw new Error("Production credit accounts are created by controlled RPCs.");
   }
 
   async listLedger(userId?: string): Promise<ServerCreditLedgerEntry[]> {
@@ -229,46 +216,12 @@ export class SupabaseAdminRepository implements AdminRepository {
   }
 
   async appendLedger(
-    entry: ServerCreditLedgerEntry,
+    _entry: ServerCreditLedgerEntry,
   ): Promise<ServerCreditLedgerEntry> {
-    const existing = (await this.listLedger(entry.userId)).find(
-      (item) => item.tenantId === entry.tenantId
-        && item.idempotencyKey === entry.idempotencyKey,
+    void _entry;
+    throw new Error(
+      "Direct production ledger inserts are disabled; use a transactional RPC.",
     );
-    if (existing) return existing;
-    const result = await this.client.from("credit_ledger").insert({
-      id: entry.id,
-      account_id: entry.accountId,
-      tenant_id: entry.tenantId,
-      user_id: entry.userId,
-      kind: entry.kind,
-      amount: entry.amount,
-      reason: entry.reason,
-      idempotency_key: entry.idempotencyKey,
-      actor_id: entry.actorId,
-      billing_operation_id: entry.billingOperationId,
-      modality: entry.modality,
-      provider: entry.provider,
-      model: entry.model,
-      price_policy_version: entry.pricePolicyVersion,
-      cost_source: entry.costSource,
-      provider_currency: entry.providerCurrency,
-      provider_cost_minor: entry.providerCostMinor,
-      provider_minor_unit_scale: entry.providerMinorUnitScale,
-      reserved_credits: entry.reservedCredits,
-      settled_credits: entry.settledCredits,
-      created_at: entry.createdAt,
-    });
-    if (result.error) {
-      // A concurrent insert may win the unique idempotency key race.
-      const raced = (await this.listLedger(entry.userId)).find(
-        (item) => item.tenantId === entry.tenantId
-          && item.idempotencyKey === entry.idempotencyKey,
-      );
-      if (raced) return raced;
-      throw new Error(result.error.message);
-    }
-    return entry;
   }
 
   async reserveLedger(
@@ -299,7 +252,12 @@ export class SupabaseAdminRepository implements AdminRepository {
         created_at: entry.createdAt,
       },
     });
-    if (result.error) throw new Error(result.error.message);
+    if (result.error) {
+      if (result.error.message.includes("INSUFFICIENT_CREDITS")) {
+        throw new Error("INSUFFICIENT_CREDITS");
+      }
+      throw new ProductionDatabaseGateError();
+    }
     const current = (await this.listLedger(entry.userId)).find(
       (item) => item.tenantId === entry.tenantId
         && item.idempotencyKey === entry.idempotencyKey,
@@ -342,7 +300,7 @@ export class SupabaseAdminRepository implements AdminRepository {
         created_at: entry.createdAt,
       },
     });
-    if (result.error) throw new Error(result.error.message);
+    if (result.error) throw new ProductionDatabaseGateError();
     const current = (await this.listLedger(entry.userId)).find(
       (item) =>
         item.tenantId === entry.tenantId
@@ -351,6 +309,68 @@ export class SupabaseAdminRepository implements AdminRepository {
     );
     if (!current) throw new Error("Billing terminal was not persisted.");
     return current;
+  }
+
+  async adjustCreditsAtomically(
+    input: AtomicCreditAdjustmentInput,
+  ): Promise<AtomicCreditAdjustmentResult> {
+    const result = await this.client.rpc("aistory_admin_adjust_credits", {
+      adjustment: {
+        actor_id: input.actor.userId,
+        tenant_id: input.tenantId,
+        user_id: input.userId,
+        amount: input.amount,
+        reason: input.reason,
+        idempotency_key: input.idempotencyKey,
+        request_id: input.requestId,
+      },
+    });
+    if (result.error) {
+      throw new Error("Production credit adjustment is unavailable.");
+    }
+    const payload = result.data && typeof result.data === "object"
+      ? result.data as Record<string, unknown>
+      : {};
+    const entryId = stringValue(payload.entry_id);
+    const entry = (await this.listLedger(input.userId)).find(
+      (item) => item.id === entryId
+        && item.tenantId === input.tenantId
+        && item.idempotencyKey === input.idempotencyKey,
+    );
+    if (!entry) {
+      throw new Error("Production credit adjustment was not persisted.");
+    }
+    return {
+      entry,
+      balanceBefore: numberValue(payload.balance_before),
+      balanceAfter: numberValue(payload.balance_after),
+      replayed: payload.replayed === true,
+    };
+  }
+
+  async applyAdminMutationAtomically(
+    mutation: AtomicAdminMutation,
+    audit: AdminAuditLog,
+  ): Promise<void> {
+    const result = await this.client.rpc("aistory_admin_apply_mutation", {
+      mutation,
+      audit: {
+        id: audit.id,
+        tenant_id: audit.tenantId,
+        actor_id: audit.actorId,
+        action: audit.action,
+        target_type: audit.targetType,
+        target_id: audit.targetId,
+        before_summary: audit.beforeSummary,
+        after_summary: audit.afterSummary,
+        reason: audit.reason,
+        request_id: audit.requestId,
+        created_at: audit.createdAt,
+      },
+    });
+    if (result.error || result.data !== true) {
+      throw new Error("Production admin mutation is unavailable.");
+    }
   }
 
   async appendEvent(event: GameplayEvent): Promise<void> {
@@ -516,18 +536,9 @@ export class SupabaseAdminRepository implements AdminRepository {
     }));
   }
 
-  async saveSettingsVersion(version: PlatformSettingsVersion): Promise<void> {
-    await write(this.client.from("platform_settings").upsert({
-      id: version.id,
-      tenant_id: version.tenantId,
-      channel_id: version.channelId,
-      status: version.status,
-      version: version.version,
-      branding: version.branding,
-      created_by: version.createdBy,
-      created_at: version.createdAt,
-      published_at: version.publishedAt,
-    }));
+  async saveSettingsVersion(_version: PlatformSettingsVersion): Promise<void> {
+    void _version;
+    throw new Error("Use the transactional production admin mutation RPC.");
   }
 
   async listPaymentConfigs(): Promise<PaymentProviderConfig[]> {
@@ -550,19 +561,9 @@ export class SupabaseAdminRepository implements AdminRepository {
     }));
   }
 
-  async savePaymentConfig(config: PaymentProviderConfig): Promise<void> {
-    await write(this.client.from("payment_provider_configs").upsert({
-      id: config.id,
-      tenant_id: config.tenantId,
-      channel_id: config.channelId,
-      provider: config.provider,
-      enabled: config.enabled,
-      sandbox: config.sandbox,
-      status: config.status,
-      secret_reference: config.secretReference,
-      webhook_path: config.webhookPath,
-      updated_at: config.updatedAt,
-    }));
+  async savePaymentConfig(_config: PaymentProviderConfig): Promise<void> {
+    void _config;
+    throw new Error("Use the transactional production admin mutation RPC.");
   }
 
   async listProviderConfigs(): Promise<PlatformProviderConfig[]> {
@@ -586,20 +587,9 @@ export class SupabaseAdminRepository implements AdminRepository {
     }));
   }
 
-  async saveProviderConfig(config: PlatformProviderConfig): Promise<void> {
-    await write(this.client.from("platform_provider_configs").upsert({
-      id: config.id,
-      tenant_id: config.tenantId,
-      modality: config.modality,
-      provider: config.provider,
-      base_url: config.baseUrl,
-      model: config.model,
-      capabilities: config.capabilities,
-      enabled: config.enabled,
-      status: config.status,
-      secret_reference: config.secretReference,
-      updated_at: config.updatedAt,
-    }));
+  async saveProviderConfig(_config: PlatformProviderConfig): Promise<void> {
+    void _config;
+    throw new Error("Use the transactional production admin mutation RPC.");
   }
   async listDomains(): Promise<DomainBinding[]> {
     const data = await rows(this.client.from("domain_bindings").select("*"));
@@ -618,20 +608,9 @@ export class SupabaseAdminRepository implements AdminRepository {
     }));
   }
 
-  async saveDomain(binding: DomainBinding): Promise<void> {
-    await write(this.client.from("domain_bindings").upsert({
-      id: binding.id,
-      tenant_id: binding.tenantId,
-      channel_id: binding.channelId,
-      domain: binding.domain,
-      purpose: binding.purpose,
-      verification_status: binding.verificationStatus,
-      dns_status: binding.dnsStatus,
-      certificate_status: binding.certificateStatus,
-      infrastructure_applied: binding.infrastructureApplied,
-      created_at: binding.createdAt,
-      updated_at: binding.updatedAt,
-    }));
+  async saveDomain(_binding: DomainBinding): Promise<void> {
+    void _binding;
+    throw new Error("Use the transactional production admin mutation RPC.");
   }
 
   async listChannelApps(): Promise<ChannelApp[]> {
@@ -667,28 +646,9 @@ export class SupabaseAdminRepository implements AdminRepository {
     }));
   }
 
-  async saveChannelApp(app: ChannelApp): Promise<void> {
-    await write(this.client.from("channel_apps").upsert({
-      id: app.id,
-      tenant_id: app.tenantId,
-      channel_id: app.channelId,
-      kind: app.kind,
-      name: app.name,
-      status: app.status,
-      version: app.version,
-      auth_methods: app.authMethods,
-      payment_providers: app.paymentProviders,
-      redirect_uris: app.redirectUris,
-      cors_origins: app.corsOrigins,
-      scopes: app.scopes,
-      rate_limit_per_minute: app.rateLimitPerMinute,
-      client_id: app.clientId,
-      client_secret_hash: app.clientSecretHash,
-      webhook_secret_reference: app.webhookSecretReference,
-      model_daily_budget: app.modelDailyBudget,
-      content_policy: app.contentPolicy,
-      updated_at: app.updatedAt,
-    }));
+  async saveChannelApp(_app: ChannelApp): Promise<void> {
+    void _app;
+    throw new Error("Use the transactional production admin mutation RPC.");
   }
 
   async resolveBranding(
@@ -744,36 +704,14 @@ export class SupabaseAdminRepository implements AdminRepository {
     };
   }
 
-  async saveBillingPolicy(policy: BillingPolicy): Promise<void> {
-    await write(this.client.from("billing_policies").upsert({
-      tenant_id: "platform",
-      version: policy.version,
-      markup_basis_points: policy.markupBasisPoints,
-      initial_grant_credits: policy.initialGrantCredits,
-      provider_currency: policy.providerCurrency,
-      provider_minor_unit_scale: policy.providerMinorUnitScale,
-      credit_units_per_provider_minor: policy.creditUnitsPerProviderMinor,
-      entries: policy.entries,
-      updated_at: policy.updatedAt,
-      updated_by: policy.updatedBy,
-    }, { onConflict: "tenant_id,version" }));
+  async saveBillingPolicy(_policy: BillingPolicy): Promise<void> {
+    void _policy;
+    throw new Error("Use the transactional production admin mutation RPC.");
   }
 
-  async appendAudit(log: AdminAuditLog): Promise<void> {
-    await write(this.client.from("admin_audit_logs").insert({
-      id: log.id,
-      tenant_id: log.tenantId,
-      actor_id: log.actorId === "local-admin" ? null : log.actorId,
-      actor_roles: log.actorRoles,
-      action: log.action,
-      target_type: log.targetType,
-      target_id: log.targetId,
-      before_summary: log.beforeSummary,
-      after_summary: log.afterSummary,
-      reason: log.reason,
-      request_id: log.requestId,
-      created_at: log.createdAt,
-    }));
+  async appendAudit(_log: AdminAuditLog): Promise<void> {
+    void _log;
+    throw new Error("Use a controlled transactional audit RPC.");
   }
 
   async listAudit(): Promise<AdminAuditLog[]> {
@@ -811,6 +749,7 @@ export class SupabaseAdminRepository implements AdminRepository {
 }
 
 export function createSupabaseAdminRepository(): SupabaseAdminRepository {
+  assertProductionDatabaseGate("identity");
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) {

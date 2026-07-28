@@ -14,11 +14,19 @@ import {
   markPhoneChallengeSent,
   verifyAndConsumePhoneChallenge,
 } from "./phoneAuthStore";
+import {
+  getProductionPhoneIdentityRepository,
+  type ProductionPhoneIdentityRepository,
+} from "./phoneIdentityRepository";
 import { createAliyunSmsProvider } from "./aliyunSmsProvider";
 import {
   PhoneAuthError,
   type SmsVerificationProvider,
 } from "./smsProvider";
+import {
+  assertProductionDatabaseGate,
+  ProductionDatabaseGateError,
+} from "@/lib/production/databaseGate";
 
 export { PhoneAuthError };
 export type { SmsVerificationProvider };
@@ -143,34 +151,49 @@ export async function requestPhoneOtp(input: {
   now?: number;
   provider?: SmsVerificationProvider;
   challengeStore?: PhoneOtpChallengeStore;
+  identityRepository?: ProductionPhoneIdentityRepository;
 }): Promise<{ challengeId: string; maskedPhone: string; expiresInSeconds: number }> {
   const now = input.now ?? Date.now();
   const challengeStore = input.challengeStore ?? DEFAULT_CHALLENGE_STORE;
   const normalized = normalizePhone(input.phone);
   const identity = phoneIdentity(normalized);
   const ipHash = requestIpHash(input.ip);
-  const recent = await challengeStore.listRecent(
-    identity.phoneHash,
-    ipHash,
-    now - REQUEST_WINDOW_MS,
-  );
-  const phoneRequests = recent.filter(
-    (item) => item.phoneHash === identity.phoneHash,
-  );
-  const ipRequests = recent.filter((item) => item.requestIpHash === ipHash);
-  const last = phoneRequests.sort((a, b) => b.createdAt - a.createdAt)[0];
-  if (
-    (last && now - last.createdAt < 60_000)
-    || phoneRequests.length >= PHONE_REQUEST_LIMIT
-    || ipRequests.length >= IP_REQUEST_LIMIT
-  ) {
-    throw new PhoneAuthError(
-      "SMS_RATE_LIMITED",
-      429,
-      "验证码请求过于频繁，请稍后再试。",
-    );
-  }
   const provider = input.provider ?? resolveSmsProvider();
+  const productionIdentity =
+    process.env.AISTORY_IDENTITY_REPOSITORY === "supabase"
+    || (
+      process.env.AISTORY_SMS_PROVIDER === "aliyun_dysms"
+      && provider.id === "aliyun_dysms"
+    );
+  let identityRepository: ProductionPhoneIdentityRepository | undefined;
+  if (productionIdentity) {
+    assertProductionDatabaseGate("sms");
+    identityRepository =
+      input.identityRepository ?? getProductionPhoneIdentityRepository();
+    await identityRepository.assertReady();
+  } else {
+    const recent = await challengeStore.listRecent(
+      identity.phoneHash,
+      ipHash,
+      now - REQUEST_WINDOW_MS,
+    );
+    const phoneRequests = recent.filter(
+      (item) => item.phoneHash === identity.phoneHash,
+    );
+    const ipRequests = recent.filter((item) => item.requestIpHash === ipHash);
+    const last = phoneRequests.sort((a, b) => b.createdAt - a.createdAt)[0];
+    if (
+      (last && now - last.createdAt < 60_000)
+      || phoneRequests.length >= PHONE_REQUEST_LIMIT
+      || ipRequests.length >= IP_REQUEST_LIMIT
+    ) {
+      throw new PhoneAuthError(
+        "SMS_RATE_LIMITED",
+        429,
+        "验证码请求过于频繁，请稍后再试。",
+      );
+    }
+  }
   if (!provider.available) {
     throw new PhoneAuthError(
       "SMS_PROVIDER_UNAVAILABLE",
@@ -180,24 +203,37 @@ export async function requestPhoneOtp(input: {
   }
   const challengeId = randomUUID();
   const code = createOtpCode(provider);
-  await challengeStore.create({
-    id: challengeId,
-    phoneHash: identity.phoneHash,
-    maskedPhone: identity.maskedPhone,
-    otpHash: otpHash(challengeId, identity.phoneHash, code),
-    requestIpHash: ipHash,
-    createdAt: now,
-    expiresAt: now + OTP_TTL_MS,
-    attempts: 0,
-    status: "pending",
-  });
+  const challengeOtpHash = otpHash(challengeId, identity.phoneHash, code);
+  if (identityRepository) {
+    await identityRepository.createPendingChallenge({
+      id: challengeId,
+      phoneHash: identity.phoneHash,
+      otpHash: challengeOtpHash,
+      requestIpHash: ipHash,
+    });
+  } else {
+    await challengeStore.create({
+      id: challengeId,
+      phoneHash: identity.phoneHash,
+      maskedPhone: identity.maskedPhone,
+      otpHash: challengeOtpHash,
+      requestIpHash: ipHash,
+      createdAt: now,
+      expiresAt: now + OTP_TTL_MS,
+      attempts: 0,
+      status: "pending",
+    });
+  }
   try {
     await provider.sendVerificationCode({
       phone: normalized,
       code,
       expiresInSeconds: OTP_TTL_MS / 1000,
     });
-    if (!await challengeStore.markSent(challengeId)) {
+    const markedSent = identityRepository
+      ? await identityRepository.markChallengeSent(challengeId)
+      : await challengeStore.markSent(challengeId);
+    if (!markedSent) {
       throw new PhoneAuthError(
         "SMS_PROVIDER_UNAVAILABLE",
         503,
@@ -205,8 +241,13 @@ export async function requestPhoneOtp(input: {
       );
     }
   } catch (error) {
-    await challengeStore.invalidate(challengeId).catch(() => undefined);
+    await (
+      identityRepository
+        ? identityRepository.invalidateChallenge(challengeId)
+        : challengeStore.invalidate(challengeId)
+    ).catch(() => undefined);
     if (error instanceof PhoneAuthError) throw error;
+    if (error instanceof ProductionDatabaseGateError) throw error;
     throw new PhoneAuthError(
       "SMS_PROVIDER_UNAVAILABLE",
       503,
@@ -227,11 +268,14 @@ export async function verifyPhoneOtp(
     challengeId: string;
     code: string;
     now?: number;
+    locale?: string;
+    identityRepository?: ProductionPhoneIdentityRepository;
   },
 ): Promise<{
   userId: string;
   maskedPhone: string;
   created: boolean;
+  initialGrantApplied: boolean;
   balance: number;
 }> {
   const now = input.now ?? Date.now();
@@ -242,6 +286,26 @@ export async function verifyPhoneOtp(
       400,
       "验证码无效或已过期。",
     );
+  }
+  if (process.env.AISTORY_IDENTITY_REPOSITORY === "supabase") {
+    assertProductionDatabaseGate("identity");
+    const identityRepository =
+      input.identityRepository ?? getProductionPhoneIdentityRepository();
+    const verified = await identityRepository.verifyAndRegister({
+      challengeId: input.challengeId,
+      phoneHash: identity.phoneHash,
+      otpHash: otpHash(input.challengeId, identity.phoneHash, input.code),
+      maskedPhone: identity.maskedPhone,
+      locale: input.locale || "zh-CN",
+    });
+    if (!verified) {
+      throw new PhoneAuthError(
+        "OTP_INVALID_OR_EXPIRED",
+        400,
+        "验证码无效或已过期。",
+      );
+    }
+    return verified;
   }
   const status = await verifyAndConsumePhoneChallenge({
     challengeId: input.challengeId,
@@ -282,6 +346,7 @@ export async function verifyPhoneOtp(
     userId: identity.userId,
     maskedPhone: identity.maskedPhone,
     created: !existing,
+    initialGrantApplied: !existing,
     balance: ledger.reduce((sum, entry) => sum + entry.amount, 0),
   };
 }

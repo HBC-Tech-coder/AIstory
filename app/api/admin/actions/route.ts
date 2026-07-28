@@ -5,7 +5,7 @@ import {
   addAdminRole,
   adjustCredits,
   buildAdminSnapshot,
-  getAdminRepository,
+  getAdminRepositoryForActor,
   previewCreditGrant,
   publishBrandingVersion,
   saveBrandingDraft,
@@ -88,9 +88,12 @@ export async function POST(request: Request): Promise<Response> {
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const repository = getAdminRepository();
   const requestId = request.headers.get("x-request-id") || randomUUID();
+  let repository:
+    | Awaited<ReturnType<typeof getAdminRepositoryForActor>>
+    | undefined;
   try {
+    repository = await getAdminRepositoryForActor(actor);
     let result: unknown;
     switch (body.action) {
       case "credit.adjust":
@@ -188,9 +191,18 @@ export async function POST(request: Request): Promise<Response> {
       requestId,
     });
   } catch (error) {
+    const productionFailure =
+      actor.mode === "production" || repository?.source === "supabase";
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Action failed", requestId },
-      { status: 400 },
+      {
+        error: productionFailure
+          ? "管理员操作暂时不可用。"
+          : error instanceof Error
+            ? error.message
+            : "Action failed",
+        requestId,
+      },
+      { status: productionFailure ? 503 : 400 },
     );
   }
 }

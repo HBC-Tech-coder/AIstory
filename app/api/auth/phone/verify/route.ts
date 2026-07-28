@@ -11,6 +11,7 @@ import {
   userSessionCookieOptions,
 } from "@/lib/auth/userSession";
 import { getAdminRepository } from "@/lib/admin/service";
+import { ProductionDatabaseGateError } from "@/lib/production/databaseGate";
 import { isTrustedLoopbackMutationRequest } from "@/lib/security/localMutation";
 
 export const runtime = "nodejs";
@@ -55,7 +56,7 @@ export async function POST(request: Request): Promise<Response> {
         userId: account.userId,
         maskedPhone: account.maskedPhone,
         balance: account.balance,
-        initialGrantApplied: account.created,
+        initialGrantApplied: account.initialGrantApplied,
       },
     });
     response.cookies.set(
@@ -65,6 +66,12 @@ export async function POST(request: Request): Promise<Response> {
     );
     return response;
   } catch (error) {
+    if (error instanceof ProductionDatabaseGateError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
+    }
     if (error instanceof PhoneAuthError) {
       return NextResponse.json(
         { error: error.message, code: error.code },

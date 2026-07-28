@@ -2,11 +2,13 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import type { AdminRepository } from "./repositories";
+import type { AtomicAdminMutation } from "./repositories";
 import {
   getLocalAdminRepository,
   LocalAdminRepository,
 } from "./localRepository";
 import { createSupabaseAdminRepository } from "./supabaseRepository";
+import { assertProductionDatabaseGateReady } from "@/lib/production/databaseGate";
 import type {
   AdminActor,
   AdminAuditLog,
@@ -55,8 +57,7 @@ function safeSummary(
   );
 }
 
-async function audit(
-  repository: AdminRepository,
+function buildAuditLog(
   actor: AdminActor,
   input: {
     action: string;
@@ -67,8 +68,8 @@ async function audit(
     reason?: string;
     requestId: string;
   },
-): Promise<void> {
-  const log: AdminAuditLog = {
+): AdminAuditLog {
+  return {
     id: randomUUID(),
     tenantId: TENANT,
     actorId: actor.userId,
@@ -86,19 +87,68 @@ async function audit(
     requestId: input.requestId,
     createdAt: now(),
   };
+}
+
+async function persistAdminMutation(
+  repository: AdminRepository,
+  actor: AdminActor,
+  mutation: AtomicAdminMutation,
+  auditInput: Parameters<typeof buildAuditLog>[1],
+  localWrite: () => Promise<void>,
+): Promise<void> {
+  const log = buildAuditLog(actor, auditInput);
+  if (repository.source === "supabase") {
+    await repository.applyAdminMutationAtomically(mutation, log);
+    return;
+  }
+  await localWrite();
   await repository.appendAudit(log);
 }
 
 let repositorySingleton: AdminRepository | undefined;
 
 export function getAdminRepository(): AdminRepository {
-  if (repositorySingleton) return repositorySingleton;
-  if (process.env.AISTORY_ADMIN_REPOSITORY === "supabase") {
+  const useSupabase = process.env.AISTORY_ADMIN_REPOSITORY === "supabase";
+  if (
+    repositorySingleton
+    && repositorySingleton.source
+      === (useSupabase ? "supabase" : "local_development")
+  ) return repositorySingleton;
+  if (useSupabase) {
     repositorySingleton = createSupabaseAdminRepository();
   } else {
     repositorySingleton = getLocalAdminRepository();
   }
   return repositorySingleton;
+}
+
+export async function getAdminRepositoryForActor(
+  actor: AdminActor,
+  options?: {
+    localRepository?: AdminRepository;
+    productionRepository?: AdminRepository;
+    assertProductionReady?: () => Promise<void>;
+  },
+): Promise<AdminRepository> {
+  if (actor.mode === "local") {
+    const repository =
+      options?.localRepository ?? getLocalAdminRepository();
+    if (repository.source !== "local_development") {
+      throw new Error("Local administrator repository mismatch.");
+    }
+    return repository;
+  }
+
+  await (
+    options?.assertProductionReady
+    ?? (() => assertProductionDatabaseGateReady("identity"))
+  )();
+  const repository =
+    options?.productionRepository ?? createSupabaseAdminRepository();
+  if (repository.source !== "supabase") {
+    throw new Error("Production administrator repository mismatch.");
+  }
+  return repository;
 }
 
 export async function buildAdminSnapshot(
@@ -184,6 +234,11 @@ export async function createUserWithInitialGrant(
     tags?: string[];
   },
 ): Promise<UserProjection> {
+  if (repository.source === "supabase") {
+    throw new Error(
+      "Production registration must use the transactional identity RPC.",
+    );
+  }
   const existing = await repository.getUser(input.userId);
   const createdAt = input.createdAt || now();
   const user: UserProjection = existing || {
@@ -251,55 +306,19 @@ export async function adjustCredits(
   }
   const user = await repository.getUser(input.userId);
   if (!user) throw new Error("用户不存在");
-  let account = await repository.getAccount(input.userId, user.tenantId);
-  if (!account) {
-    account = {
-      id: randomUUID(),
-      tenantId: user.tenantId,
-      userId: user.userId,
-      currency: "credit",
-      createdAt: now(),
-    };
-    await repository.createAccount(account);
-  }
-  const ledgerBefore = await repository.listLedger(input.userId);
-  const existing = ledgerBefore.find(
-    (entry) => entry.tenantId === user.tenantId
-      && entry.idempotencyKey === input.idempotencyKey,
-  );
-  if (existing) return existing;
-  const balanceBefore = ledgerBefore
-    .filter((entry) => entry.tenantId === user.tenantId)
-    .reduce((sum, entry) => sum + entry.amount, 0);
-  const proposedEntryId = randomUUID();
-  const entry = await repository.appendLedger({
-    id: proposedEntryId,
-    accountId: account.id,
+  const result = await repository.adjustCreditsAtomically({
+    actor,
     tenantId: user.tenantId,
     userId: user.userId,
-    kind: "manual_adjustment",
     amount: input.amount,
     reason: input.reason.trim(),
     idempotencyKey: input.idempotencyKey,
-    actorId: actor.userId,
+    requestId: input.requestId,
+    entryId: randomUUID(),
+    auditId: randomUUID(),
     createdAt: now(),
   });
-  if (entry.id !== proposedEntryId) return entry;
-  await audit(repository, actor, {
-    action: "credit.manual_adjustment",
-    targetType: "credit_account",
-    targetId: account.id,
-    beforeSummary: { userId: user.userId, balance: balanceBefore },
-    afterSummary: {
-      userId: user.userId,
-      amount: entry.amount,
-      entryId: entry.id,
-      balance: balanceBefore + entry.amount,
-    },
-    reason: input.reason,
-    requestId: input.requestId,
-  });
-  return entry;
+  return result.entry;
 }
 
 export async function saveBillingPolicy(
@@ -347,8 +366,10 @@ export async function saveBillingPolicy(
     updatedAt: now(),
     updatedBy: actor.userId,
   };
-  await repository.saveBillingPolicy(policy);
-  await audit(repository, actor, {
+  await persistAdminMutation(repository, actor, {
+    kind: "billing_policy.save",
+    payload: policy,
+  }, {
     action: "billing.policy_save",
     targetType: "billing_policy",
     targetId: policy.version,
@@ -366,6 +387,8 @@ export async function saveBillingPolicy(
     },
     reason,
     requestId,
+  }, async () => {
+    await repository.saveBillingPolicy(policy);
   });
   return policy;
 }
@@ -395,8 +418,10 @@ export async function updateUserStatus(
     status: input.status,
     tags: [...new Set(input.tags.map((tag) => tag.trim()).filter(Boolean))].slice(0, 20),
   };
-  await repository.saveUser(after);
-  await audit(repository, actor, {
+  await persistAdminMutation(repository, actor, {
+    kind: "user.save",
+    payload: after,
+  }, {
     action: "user.status_update",
     targetType: "profile",
     targetId: input.userId,
@@ -404,6 +429,8 @@ export async function updateUserStatus(
     afterSummary: { status: after.status, tags: after.tags },
     reason: input.reason,
     requestId: input.requestId,
+  }, async () => {
+    await repository.saveUser(after);
   });
   return after;
 }
@@ -432,8 +459,10 @@ export async function addAdminRole(
     createdAt: now(),
     createdBy: actor.userId,
   };
-  await repository.addRole(role);
-  await audit(repository, actor, {
+  await persistAdminMutation(repository, actor, {
+    kind: "role.add",
+    payload: role,
+  }, {
     action: "admin.role_add",
     targetType: "user_role",
     targetId: `${role.userId}:${role.tenantId}:${role.role}`,
@@ -444,6 +473,8 @@ export async function addAdminRole(
     },
     reason: input.reason,
     requestId: input.requestId,
+  }, async () => {
+    await repository.addRole(role);
   });
   return role;
 }
@@ -488,8 +519,10 @@ export async function saveBrandingDraft(
     createdAt: now(),
     createdBy: actor.userId,
   };
-  await repository.saveSettingsVersion(version);
-  await audit(repository, actor, {
+  await persistAdminMutation(repository, actor, {
+    kind: "settings.save",
+    payload: version,
+  }, {
     action: "platform.branding_preview",
     targetType: "platform_settings_version",
     targetId: version.id,
@@ -499,6 +532,8 @@ export async function saveBrandingDraft(
       defaultInitialCredits: version.branding.defaultInitialCredits,
     },
     requestId,
+  }, async () => {
+    await repository.saveSettingsVersion(version);
   });
   return version;
 }
@@ -520,8 +555,10 @@ export async function publishBrandingVersion(
     status: "published",
     publishedAt: now(),
   };
-  await repository.saveSettingsVersion(published);
-  await audit(repository, actor, {
+  await persistAdminMutation(repository, actor, {
+    kind: "settings.save",
+    payload: published,
+  }, {
     action: "platform.branding_publish",
     targetType: "platform_settings_version",
     targetId: versionId,
@@ -532,6 +569,8 @@ export async function publishBrandingVersion(
     },
     reason,
     requestId,
+  }, async () => {
+    await repository.saveSettingsVersion(published);
   });
   return published;
 }
@@ -553,8 +592,10 @@ export async function savePaymentMetadata(
     status: input.secretReference ? "configured" : "unconfigured",
     updatedAt: now(),
   };
-  await repository.savePaymentConfig(stored);
-  await audit(repository, actor, {
+  await persistAdminMutation(repository, actor, {
+    kind: "payment_config.save",
+    payload: stored,
+  }, {
     action: "payment.config_update",
     targetType: "payment_provider_config",
     targetId: stored.id,
@@ -567,6 +608,8 @@ export async function savePaymentMetadata(
     },
     reason,
     requestId,
+  }, async () => {
+    await repository.savePaymentConfig(stored);
   });
 }
 
@@ -599,8 +642,10 @@ export async function savePlatformProviderMetadata(
     status: input.enabled ? "configured" : "disabled",
     updatedAt: now(),
   };
-  await repository.saveProviderConfig(stored);
-  await audit(repository, actor, {
+  await persistAdminMutation(repository, actor, {
+    kind: "provider_config.save",
+    payload: stored,
+  }, {
     action: "platform.provider_config_update",
     targetType: "platform_provider_config",
     targetId: stored.id,
@@ -613,6 +658,8 @@ export async function savePlatformProviderMetadata(
     },
     reason,
     requestId,
+  }, async () => {
+    await repository.saveProviderConfig(stored);
   });
 }
 export async function saveDomainBinding(
@@ -638,8 +685,10 @@ export async function saveDomainBinding(
     createdAt,
     updatedAt: createdAt,
   };
-  await repository.saveDomain(binding);
-  await audit(repository, actor, {
+  await persistAdminMutation(repository, actor, {
+    kind: "domain.save",
+    payload: binding,
+  }, {
     action: "domain.binding_save",
     targetType: "domain_binding",
     targetId: binding.id,
@@ -651,6 +700,8 @@ export async function saveDomainBinding(
     },
     reason,
     requestId,
+  }, async () => {
+    await repository.saveDomain(binding);
   });
   return binding;
 }
@@ -668,8 +719,10 @@ export async function saveChannelApplication(
     clientSecretHash: input.clientSecretHash,
     updatedAt: now(),
   };
-  await repository.saveChannelApp(safe);
-  await audit(repository, actor, {
+  await persistAdminMutation(repository, actor, {
+    kind: "channel_app.save",
+    payload: safe,
+  }, {
     action: "channel.application_save",
     targetType: "channel_app",
     targetId: safe.id,
@@ -682,6 +735,8 @@ export async function saveChannelApplication(
     },
     reason,
     requestId,
+  }, async () => {
+    await repository.saveChannelApp(safe);
   });
 }
 
