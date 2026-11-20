@@ -9,7 +9,7 @@
 - [浏览测试分支](https://github.com/HBC-Tech-coder/AIstory/tree/codex/aistory-current-source-20261120)
 - [下载完整 ZIP](https://github.com/HBC-Tech-coder/AIstory/archive/refs/heads/codex/aistory-current-source-20261120.zip)
 
-仓库目前是私有的：先让仓库所有者邀请你的 GitHub 账号，接受邀请并登录 GitHub，再下载。没有权限时可能显示 404。
+仓库已公开：朋友无需协作者邀请，也无需登录 GitHub，即可浏览代码和下载 ZIP。
 
 也可以使用 Git：
 
