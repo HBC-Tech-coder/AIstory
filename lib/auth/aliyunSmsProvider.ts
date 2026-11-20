@@ -13,6 +13,7 @@ import {
   PhoneAuthError,
   type SmsVerificationProvider,
 } from "./smsProvider";
+import { PHONE_OTP_COOLDOWN_SECONDS } from "./phoneOtpPolicy";
 
 export const ALIYUN_SMS_API_VERSION = "2017-05-25";
 export const ALIYUN_SMS_DEFAULT_ENDPOINT = "dysmsapi.aliyuncs.com";
@@ -78,6 +79,7 @@ function rateLimited(): PhoneAuthError {
     "SMS_RATE_LIMITED",
     429,
     "验证码请求过于频繁，请稍后再试。",
+    PHONE_OTP_COOLDOWN_SECONDS,
   );
 }
 

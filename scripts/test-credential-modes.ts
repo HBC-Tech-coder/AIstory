@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { EngineConfig } from "@infiplot/types";
 
 import {
   clearStoredModelConfig,
@@ -19,6 +20,7 @@ import {
 import { proxyLLM } from "@/lib/byoProxy";
 import { LocalAdminRepository } from "@/lib/admin/localRepository";
 import { buildAdminSnapshot } from "@/lib/admin/service";
+import { buildByoEngineConfig } from "@/lib/config";
 
 class MemoryStorage implements Storage {
   private readonly data = new Map<string, string>();
@@ -51,28 +53,88 @@ const modelConfig: StoredModelConfig = {
 };
 
 async function main(): Promise<void> {
-  assert.equal(authorizeCredentialAccess({
+  const legacySupabase = authorizeCredentialAccess({
     requestedMode: "platform_managed",
     hasByok: false,
     userId: "external-user",
+    authType: "supabase",
+    env: {
+      AISTORY_PLATFORM_MANAGED_ENABLED: "true",
+      AISTORY_PLATFORM_MANAGED_ALLOWLIST: "internal-user",
+    },
+  });
+  assert.equal(legacySupabase.allowed, false);
+  assert.equal(
+    legacySupabase.allowed ? "" : legacySupabase.code,
+    "PHONE_VERIFICATION_REQUIRED",
+  );
+  assert.equal(authorizeCredentialAccess({
+    requestedMode: "platform_managed",
+    hasByok: false,
+    userId: "internal-user",
+    authType: "supabase",
     env: {
       AISTORY_PLATFORM_MANAGED_ENABLED: "true",
       AISTORY_PLATFORM_MANAGED_ALLOWLIST: "internal-user",
     },
   }).allowed, false);
+  const passportPlatform = authorizeCredentialAccess({
+    requestedMode: "platform_managed",
+    hasByok: false,
+    userId: `passport_v4:${"a".repeat(64)}`,
+    authType: "passport_v4",
+    env: {
+      AISTORY_PLATFORM_BILLING_ENABLED: "true",
+      AISTORY_PLATFORM_MANAGED_ENABLED: "true",
+      AISTORY_PLATFORM_MANAGED_ALLOWLIST: `passport_v4:${"a".repeat(64)}`,
+    },
+  });
+  assert.equal(passportPlatform.allowed, false);
+  assert.equal(
+    passportPlatform.allowed ? "" : passportPlatform.code,
+    "PLATFORM_MANAGED_FORBIDDEN",
+  );
+  assert.deepEqual(authorizeCredentialAccess({
+    requestedMode: "user_byok",
+    hasByok: true,
+    userId: `passport_v4:${"a".repeat(64)}`,
+    authType: "passport_v4",
+    env: { AISTORY_PLATFORM_BILLING_ENABLED: "true" },
+  }), { allowed: true, mode: "user_byok" });
   assert.equal(authorizeCredentialAccess({
     requestedMode: "platform_managed",
     hasByok: false,
     userId: "internal-user",
+    authType: "phone",
     env: {
       AISTORY_PLATFORM_MANAGED_ENABLED: "true",
       AISTORY_PLATFORM_MANAGED_ALLOWLIST: "internal-user",
     },
   }).allowed, true);
+  const formalSupabase = authorizeCredentialAccess({
+    requestedMode: "platform_managed",
+    hasByok: false,
+    userId: "supabase-user",
+    authType: "supabase",
+    env: { AISTORY_PLATFORM_BILLING_ENABLED: "true" },
+  });
+  assert.equal(formalSupabase.allowed, false);
+  assert.equal(
+    formalSupabase.allowed ? "" : formalSupabase.code,
+    "PHONE_VERIFICATION_REQUIRED",
+  );
+  assert.equal(authorizeCredentialAccess({
+    requestedMode: "platform_managed",
+    hasByok: false,
+    userId: "phone-user",
+    authType: "phone",
+    env: { AISTORY_PLATFORM_BILLING_ENABLED: "true" },
+  }).allowed, true);
   assert.equal(authorizeCredentialAccess({
     requestedMode: "platform_managed",
     hasByok: false,
     userId: "anonymous",
+    authType: "anonymous",
     env: {
       AISTORY_PLATFORM_MANAGED_ENABLED: "true",
       AISTORY_PLATFORM_MANAGED_ALLOWLIST: "anonymous",
@@ -87,6 +149,26 @@ async function main(): Promise<void> {
     image: { apiKey: "i" },
     vision: { apiKey: "v" },
   }));
+  const officialConfig: EngineConfig = {
+    text: { baseUrl: "https://platform.example", apiKey: "platform", model: "text" },
+    image: { baseUrl: "https://platform.example", apiKey: "platform", model: "image" },
+    vision: { baseUrl: "https://platform.example", apiKey: "platform", model: "vision" },
+    tts: {
+      baseUrl: "https://platform.example",
+      apiKey: "platform-tts",
+      speechModel: "speech",
+    },
+  };
+  const byokConfig = buildByoEngineConfig({
+    text: { provider: "openai", apiKey: "byok-text" },
+    image: { provider: "openai", apiKey: "byok-image" },
+    vision: { provider: "openai", apiKey: "byok-vision" },
+  }, officialConfig);
+  assert.equal(
+    byokConfig.tts,
+    undefined,
+    "server-side BYOK must never fall back to platform TTS",
+  );
   assert.equal(coercePublicPrefetchDepth(0), 0);
   assert.equal(coercePublicPrefetchDepth(1), 1);
   assert.equal(coercePublicPrefetchDepth(2), 1);

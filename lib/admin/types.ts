@@ -19,8 +19,10 @@ export type ChannelKind =
 export type AdminActor = {
   userId: string;
   roles: AdminRole[];
-  mode: "local" | "production";
+  mode: "local" | "production" | "independent";
 };
+
+export type AdminActorPublic = Pick<AdminActor, "roles" | "mode">;
 
 export type UserProjection = {
   userId: string;
@@ -96,6 +98,13 @@ export type PriceCatalogEntry = {
   model: string;
   providerCostMinor: number;
   enabled: boolean;
+  /** Missing means the backwards-compatible provider-cost contract. */
+  pricingMode?:
+    | "provider_cost_v1"
+    | "fixed_beta_credit_v1"
+    | "cost_beta_credit_v2";
+  /** Required only for fixed_beta_credit_v1 / cost_beta_credit_v2. */
+  fixedCredits?: number;
 };
 
 export type BillingPolicy = {

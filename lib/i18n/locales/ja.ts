@@ -272,6 +272,14 @@ export const ja = {
     error: {
       title: "問題が発生しました",
       back: "戻る",
+      platformUnavailableEyebrow: "生成サービス",
+      platformUnavailableTitle: "プラットフォーム生成は現在未提供です",
+      platformUnavailableDescription:
+        "既存作品、作者ロック済みストーリー、キャッシュ済みコンテンツは匿名で体験できます。続けて制作する場合は、ご自身の API を設定してください。",
+      platformUnavailableSafety:
+        "今回はプラットフォームのモデルを呼び出しておらず、未確認の価格や残高も表示していません。",
+      chooseFreeStory: "無料作品を選ぶ",
+      configureByok: "自分の API を設定",
     },
 
     // Previous action
@@ -330,6 +338,19 @@ export const ja = {
     // Models tab
     models: {
       byokTitle: "自分の API（BYOK）",
+      custodyDevice: "このブラウザーのみ",
+      custodyDeviceHint: "既存の sessionStorage / localStorage 方式を維持し、Key は AIstory アカウントに保存しません。",
+      custodyHosted: "デバイス間で保管",
+      custodyHostedHint: "ログインと直近の認証後、PC で保存し、スマートフォンや iPad で利用できます。",
+      hostedDisclosureTitle: "暗号化してアカウントに同期（任意）",
+      hostedDisclosure: "資格情報は暗号化して保存されます。明示的に利用する際、AIstory サーバーはプロバイダーへの要求のためメモリ上で一時的に復号します。エンドツーエンド暗号化ではなく、管理者にも元の Key を読み取り・出力する API はありません。料金はプロバイダーから利用者に請求され、AIstory ポイントは消費しません。",
+      hostedReady: "保管庫と直近認証ゲートは準備済みです。保存時にプロバイダーへ接続しません。",
+      hostedUnavailable: "デバイス間保管はまだ有効ではありません。このブラウザーのみのモードをご利用ください。",
+      hostedFieldsMissing: "選択した機能の Provider、Base URL、Model、API Key を入力してください。",
+      hostedSave: "選択機能を暗号化して同期",
+      hostedWorking: "処理中…",
+      hostedDelete: "削除",
+      hostedTtsPending: "TTS 保管契約は予約済みです。現在の TTS フォームはブラウザーのみで、Key は自動アップロードされません。",
       costResponsibility: "自分のキーを使用する場合、料金は各プロバイダーのアカウントに請求されます。プラットフォームポイントは未公開で、管理された内部テスト専用です。",
       callEstimate: "物語の開始・続行では通常テキストと画像を呼び出します。画像認識、音声、動画は該当機能の使用時のみ呼び出されます。実際の料金はプロバイダーの請求をご確認ください。",
       persistenceSession: "このセッションのみ（既定）",
@@ -413,15 +434,20 @@ export const ja = {
     phoneLogin: "電話番号でログイン / 登録",
     registrationHint:
       "未登録の番号は認証後に自動登録されます。初回登録時は現行ポリシーに基づき、同一アカウントへ一度だけ1,000クレジットを付与します。",
+    localProgressHint:
+      "ログイン後、このブラウザ内の対象ストーリー進行を引き継ぎます。APIキーは読み取りもアップロードもしません。",
     phonePlaceholder: "中国本土の携帯電話番号",
     sendCode: "SMS認証コードを取得",
     sending: "送信中...",
+    resendCode: "認証コードを再取得",
+    resendCountdown: "再取得（{seconds}秒）",
 
-    phoneCodeSent: "認証コードを{phone}に送信しました",
+    phoneCodeSent: "{phone} の認証コードをリクエストしました。SMS が届いたらコードを入力してください。",
     codePlaceholder: "6桁の認証コード",
     verify: "確認",
     verifying: "検証中...",
     resend: "再送信",
+    changePhone: "電話番号を変更",
 
     close: "閉じる",
     ariaLabel: "電話番号でログインまたは登録",
@@ -431,6 +457,20 @@ export const ja = {
     phoneInvalid: "有効な中国本土の携帯電話番号を入力してください。",
     smsRateLimited: "認証コードの要求が多すぎます。しばらくしてから再試行してください。",
     smsUnavailable: "SMSサービスは一時的に利用できません。認証コードは送信されていません。",
+    claimCompleteTitle: "ログイン完了",
+    claimNotFound: "引き継げるローカル進行は見つかりませんでした。ログインは完了しています。",
+    claimSummary:
+      "{stories}件のストーリーと{checkpoints}件のチェックポイントを引き継ぎ、{skipped}件は版または公開状態により除外しました。",
+    claimSkipReasonSummary: "除外カテゴリ：{reasons}",
+    claimSkipNotPublished: "未公開または制限付きコンテンツ",
+    claimSkipVersionMismatch: "バージョン不一致",
+    claimSkipNodeUnavailable: "ノード利用不可",
+    claimSkipResourceUnavailable: "キャッシュ利用不可",
+    claimSkipAssignmentUnavailable: "実験版利用不可",
+    claimSkipManifestInvalid: "マニフェスト競合",
+    claimRetryHint: "ローカル索引の切替は保留中です。更新後に同じ受領情報で安全に再試行します。",
+    sameBrowserOnly: "この段階は同一ブラウザ内の引き継ぎのみで、端末間同期には対応しません。",
+    continue: "続ける",
   },
 
   // ========== Dialogue History Modal ==========

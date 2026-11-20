@@ -1,29 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Cormorant_Garamond, Inter } from "next/font/google";
 import { Analytics } from "@/components/Analytics";
-import { LOCALES, DEFAULT_LOCALE, type Locale } from "@/lib/i18n/config";
+import { LOCALES } from "@/lib/i18n/config";
 import { localePath } from "@/lib/i18n/navigation";
 import { stripLocalePrefix } from "@/lib/i18n/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "./globals.css";
-
-// Editorial fonts: drive tailwind `font-serif`/`font-sans` via
-// --font-serif / --font-sans across every page (home, /play, /new, CustomForm).
-const cormorant = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
-  style: ["normal", "italic"],
-  variable: "--font-serif",
-  display: "swap",
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["300", "400", "500"],
-  variable: "--font-sans",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "AIstory — AI 实时交互剧情游戏",
@@ -58,7 +40,6 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={`${cormorant.variable} ${inter.variable}`}
       suppressHydrationWarning
     >
       <head>
@@ -72,7 +53,7 @@ export default async function RootLayout({
         ))}
         <link rel="alternate" hrefLang="x-default" href={`${origin}${barePath}`} />
       </head>
-      <body className="bg-cream-50 text-clay-900 font-sans antialiased min-h-screen overflow-x-hidden">
+      <body className="aistory-app bg-cream-50 text-clay-900 font-sans antialiased min-h-screen overflow-x-hidden">
         {children}
         <Analytics />
       </body>

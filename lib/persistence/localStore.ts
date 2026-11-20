@@ -9,7 +9,11 @@
 
 import type { Session } from "@infiplot/types";
 import { coerceOrientation } from "@infiplot/types";
-import { idbGet, idbGetAll, idbPut, idbDelete, idbCount, STORIES_STORE } from "./idb";
+import { idbGet, idbGetAll, idbPut, idbDelete, STORIES_STORE } from "./idb";
+import {
+  activeStoryNamespace,
+  storyStorageKey,
+} from "./storyNamespace";
 import { slimSession } from "./sessionSlim";
 import { STORY_SCHEMA_VERSION, coerceEpoch, type StoryRecord, type StoryMeta, type StorySyncEnvelope } from "./types";
 
@@ -58,21 +62,21 @@ async function enforceRetentionCap(): Promise<void> {
     // often enough to matter — skip the full scan entirely. NOTE: idbCount
     // returns 0 when IndexedDB is unavailable/fails, so `0 <= CAP` skips eviction
     // — intentional best-effort: if we can't even count, we can't safely evict.
-    const total = await idbCount(STORIES_STORE);
-    if (total <= LOCAL_STORY_CAP) return;
-
     const all = await idbGetAll<StoryRecord>(STORIES_STORE);
+    const namespace = activeStoryNamespace();
+    const owned = all.filter((record) => record.ownerNamespace === namespace);
+    if (owned.length <= LOCAL_STORY_CAP) return;
     const now = Date.now();
 
     // 1. Reap aged tombstones (bounds tombstone growth, frees slots).
-    for (const r of all) {
+    for (const r of owned) {
       if (r.deletedAt && now - coerceEpoch(r.deletedAt, now) > TOMBSTONE_RETENTION_MS) {
-        await idbDelete(STORIES_STORE, r.id);
+        await idbDelete(STORIES_STORE, r.storageKey);
       }
     }
 
     // 2. Evict oldest over-cap live records, preserving un-synced ones.
-    const live = all
+    const live = owned
       .filter((r) => !r.deletedAt)
       .sort((a, b) => coerceEpoch(a.updatedAt, 0) - coerceEpoch(b.updatedAt, 0));
     let overflow = live.length - LOCAL_STORY_CAP;
@@ -84,7 +88,7 @@ async function enforceRetentionCap(): Promise<void> {
       if (r.syncState !== "local-only") continue;
       // Only count a slot freed when the delete actually succeeded — a failed
       // best-effort delete must not decrement overflow (would under-evict).
-      if (await idbDelete(STORIES_STORE, r.id)) overflow--;
+      if (await idbDelete(STORIES_STORE, r.storageKey)) overflow--;
     }
 
     // 3. Last-resort: if step 2 couldn't reach the cap, every remaining over-cap
@@ -102,7 +106,7 @@ async function enforceRetentionCap(): Promise<void> {
       for (const r of live) {
         if (overflow <= 0) break;
         if (r.syncState === "local-only") continue; // already evicted in step 2
-        if (await idbDelete(STORIES_STORE, r.id)) overflow--;
+        if (await idbDelete(STORIES_STORE, r.storageKey)) overflow--;
       }
     }
   } catch {
@@ -122,9 +126,13 @@ export async function saveStorySession(
 ): Promise<StoryRecord | null> {
   if (!session?.id) return null;
   const now = Date.now();
-  const existing = await idbGet<StoryRecord>(STORIES_STORE, session.id);
+  const ownerNamespace = activeStoryNamespace();
+  const storageKey = storyStorageKey(ownerNamespace, session.id);
+  const existing = await idbGet<StoryRecord>(STORIES_STORE, storageKey);
 
   const record: StoryRecord = {
+    storageKey,
+    ownerNamespace,
     id: session.id,
     schemaVersion: STORY_SCHEMA_VERSION,
     worldSetting: session.worldSetting ?? "",
@@ -155,8 +163,9 @@ export async function saveStorySession(
  *  meta into its own store (or a cursor projection) to avoid reading blobs here. */
 export async function listStories(): Promise<StoryMeta[]> {
   const all = await idbGetAll<StoryRecord>(STORIES_STORE);
+  const namespace = activeStoryNamespace();
   return all
-    .filter((r) => !r.deletedAt)
+    .filter((r) => r.ownerNamespace === namespace && !r.deletedAt)
     .map(toMeta)
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
@@ -166,7 +175,10 @@ export async function listStories(): Promise<StoryMeta[]> {
  *  boundary (Req 3.6). The slim session is missing voice/styleReferenceImage by
  *  design — the engine degrades gracefully (Req 3.4). */
 export async function loadStorySession(id: string): Promise<Session | null> {
-  const rec = await idbGet<StoryRecord>(STORIES_STORE, id);
+  const rec = await idbGet<StoryRecord>(
+    STORIES_STORE,
+    storyStorageKey(activeStoryNamespace(), id),
+  );
   if (!rec || rec.deletedAt || !rec.session) return null;
   return { ...rec.session, createdAt: coerceEpoch(rec.session.createdAt, rec.createdAt) };
 }
@@ -175,7 +187,10 @@ export async function loadStorySession(id: string): Promise<Session | null> {
  *  to the cloud next phase. List queries filter tombstoned records out, so the
  *  user perceives it as deleted. Absent / already-deleted id → false (Req 3.5). */
 export async function softDeleteStory(id: string): Promise<boolean> {
-  const rec = await idbGet<StoryRecord>(STORIES_STORE, id);
+  const rec = await idbGet<StoryRecord>(
+    STORIES_STORE,
+    storyStorageKey(activeStoryNamespace(), id),
+  );
   if (!rec || rec.deletedAt) return false;
   const now = Date.now();
   const updated: StoryRecord = {
@@ -197,7 +212,10 @@ export async function softDeleteStory(id: string): Promise<boolean> {
  *  rev/syncState intact — the local mirror of cloudStoryManifest's
  *  tombstone-inclusive scan. [] when storage is unavailable. */
 export async function listAllRecordsForSync(): Promise<StoryRecord[]> {
-  return idbGetAll<StoryRecord>(STORIES_STORE);
+  const namespace = activeStoryNamespace();
+  return (await idbGetAll<StoryRecord>(STORIES_STORE)).filter(
+    (record) => record.ownerNamespace === namespace,
+  );
 }
 
 /** Write a cloud-pulled version as the authoritative synced baseline:
@@ -211,7 +229,9 @@ export async function putSyncedRecord(
   env: StorySyncEnvelope,
 ): Promise<boolean> {
   if (!env?.id) return false;
-  const existing = await idbGet<StoryRecord>(STORIES_STORE, env.id);
+  const ownerNamespace = activeStoryNamespace();
+  const storageKey = storyStorageKey(ownerNamespace, env.id);
+  const existing = await idbGet<StoryRecord>(STORIES_STORE, storageKey);
   // Concurrency guard (symmetric with markRecordSynced's rev guard): if the local
   // record was updated to a strictly newer version (rev → updatedAt) between
   // reconcile's decision snapshot and this write, don't clobber it — leave it
@@ -226,6 +246,8 @@ export async function putSyncedRecord(
     if (er > nr || (er === nr && eu > nu)) return false;
   }
   const record: StoryRecord = {
+    storageKey,
+    ownerNamespace,
     id: env.id,
     schemaVersion: STORY_SCHEMA_VERSION,
     worldSetting: env.worldSetting ?? "",
@@ -252,7 +274,10 @@ export async function putSyncedRecord(
  *  pending so the next reconcile re-pushes the newer content. No-op if the
  *  record is gone or already synced (Req 8.1). */
 export async function markRecordSynced(id: string, rev: number, updatedAt: number): Promise<void> {
-  const rec = await idbGet<StoryRecord>(STORIES_STORE, id);
+  const rec = await idbGet<StoryRecord>(
+    STORIES_STORE,
+    storyStorageKey(activeStoryNamespace(), id),
+  );
   if (!rec) return;
   // Guard on BOTH rev and updatedAt. softDeleteStory bumps updatedAt WITHOUT
   // bumping rev, so a same-rev-but-newer local tombstone produced while a push

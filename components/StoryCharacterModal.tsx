@@ -214,7 +214,7 @@ function RoleCard({
     <button
       type="button"
       onClick={() => onSelect(role)}
-      className="group w-full border border-clay-900/12 bg-cream-50/85 p-4 text-left transition-colors hover:border-amber-700/55 hover:bg-cream-100"
+      className="group w-full border border-clay-900/12 bg-cream-50/85 p-4 text-left transition-colors hover:border-ember-500/55 hover:bg-cream-100"
     >
       <div className="flex items-start gap-4">
         <div className="h-20 w-20 shrink-0 overflow-hidden border border-clay-900/12 bg-cream-100">
@@ -222,13 +222,13 @@ function RoleCard({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={role.portraitUrl} alt={role.name} className="h-full w-full object-cover" />
           ) : (
-            <span className="flex h-full w-full items-center justify-center text-2xl font-semibold text-amber-800">
+            <span className="flex h-full w-full items-center justify-center text-2xl font-semibold text-ember-500">
               {role.name.slice(0, 1)}
             </span>
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-800/80">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ember-500/80">
             {role.source === "story" ? "本剧已登场" : "我的角色"}
           </p>
           <h3 className="mt-2 text-xl font-semibold text-clay-900">{role.name}</h3>
@@ -236,9 +236,9 @@ function RoleCard({
           <p className="mt-2 text-xs font-semibold text-clay-700">
             角色性别：{characterGenderLabel(voiceProfile)}
           </p>
-          <p className="mt-2 text-xs text-amber-800">{voiceProfile.label}</p>
+          <p className="mt-2 text-xs text-ember-500">{voiceProfile.label}</p>
         </div>
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center border border-clay-900/12 text-amber-800 transition-colors group-hover:border-amber-700/55">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center border border-clay-900/12 text-ember-500 transition-colors group-hover:border-ember-500/55">
           <i className="fa-solid fa-user-plus text-[13px]" />
         </span>
       </div>
@@ -328,7 +328,10 @@ function CharacterNameEditor({
     try {
       const response = await fetch("/api/character-names", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": `generation:${crypto.randomUUID()}`,
+        },
         body: JSON.stringify({
           locale,
           culture,
@@ -367,9 +370,9 @@ function CharacterNameEditor({
           onChange={(event) => setDraft(event.target.value)}
           placeholder="输入角色姓名"
           maxLength={40}
-          className="min-w-0 flex-1 border border-clay-900/12 bg-cream-50 px-3 py-2 text-sm text-clay-900 outline-none focus:border-amber-700/55"
+          className="min-w-0 flex-1 border border-clay-900/12 bg-cream-50 px-3 py-2 text-sm text-clay-900 outline-none focus:border-ember-500/55"
         />
-        <button type="button" onClick={applyManual} className="border border-amber-700/40 px-3 py-2 text-xs font-semibold text-amber-900">
+        <button type="button" onClick={applyManual} className="border border-ember-500/40 px-3 py-2 text-xs font-semibold text-ember-500">
           应用
         </button>
       </div>
@@ -397,7 +400,7 @@ function CharacterNameEditor({
         <button type="button" onClick={() => localCandidates(6)} className="border border-clay-900/12 px-3 py-2 text-xs text-clay-700">
           换一批（6）
         </button>
-        <button type="button" disabled={busy} onClick={() => void requestAi()} className="border border-amber-700/35 px-3 py-2 text-xs font-semibold text-amber-900 disabled:opacity-45">
+        <button type="button" disabled={busy} onClick={() => void requestAi()} className="border border-ember-500/35 px-3 py-2 text-xs font-semibold text-ember-500 disabled:opacity-45">
           {busy ? "AI 起名中…" : "AI 起名 · 预计少量额度"}
         </button>
         {originalName && value !== originalName && (
@@ -427,7 +430,7 @@ function CharacterNameEditor({
               title={candidate.meaning}
               className={`border px-2.5 py-1.5 text-xs ${
                 candidate.name === value
-                  ? "border-amber-700 bg-amber-100/50 text-amber-900"
+                  ? "border-ember-500 bg-ember-500/10 text-ember-500"
                   : "border-clay-900/12 text-clay-600"
               }`}
             >
@@ -475,7 +478,7 @@ function StoryProfileCard({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={portrait} alt={profile.name} className="h-full w-full object-cover" />
           ) : (
-            <div className="flex h-full w-full flex-col items-center justify-center text-amber-800">
+            <div className="flex h-full w-full flex-col items-center justify-center text-ember-500">
               <i className="fa-solid fa-user text-2xl" />
               <span className="mt-3 text-sm">待生成立绘</span>
             </div>
@@ -484,7 +487,7 @@ function StoryProfileCard({
         <div>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-800/80">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ember-500/80">
                 第 {profile.firstSeenSceneIndex + 1} 幕登场 / 最近第 {profile.lastSeenSceneIndex + 1} 幕出现
               </p>
               <h3 className="mt-2 text-2xl font-semibold text-clay-900">{profile.name}</h3>
@@ -493,7 +496,7 @@ function StoryProfileCard({
             <button
               type="button"
               onClick={() => onSelect(roleFromProfile(profile))}
-              className="flex h-10 w-10 items-center justify-center border border-amber-700/35 text-amber-800"
+              className="flex h-10 w-10 items-center justify-center border border-ember-500/35 text-ember-500"
               title="关注这个角色"
               aria-label={`关注 ${profile.name}`}
             >
@@ -538,7 +541,7 @@ function StoryProfileCard({
                 key={sprite.id}
                 className={`border px-2 py-1 text-[11px] ${
                   profile.currentSprite?.id === sprite.id
-                    ? "border-amber-700/55 bg-amber-100/40 text-amber-900"
+                    ? "border-ember-500/55 bg-ember-500/10 text-ember-500"
                     : "border-clay-900/10 text-clay-500"
                 }`}
               >
@@ -549,7 +552,7 @@ function StoryProfileCard({
           <button
             type="button"
             onClick={() => onDesignFrom(profile)}
-            className="mt-4 border border-clay-900/12 px-3 py-2 text-xs font-semibold text-clay-600 hover:border-amber-700/45 hover:text-amber-800"
+            className="mt-4 border border-clay-900/12 px-3 py-2 text-xs font-semibold text-clay-600 hover:border-ember-500/45 hover:text-ember-500"
           >
             基于此角色再设计
           </button>
@@ -619,7 +622,7 @@ function CharacterReferencePhotoField({
             支持 JPEG、PNG、WebP，原图最多 8 MB。图片只在当前浏览器内解码、缩放和压缩，不会上传服务器或请求模型。
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <label className="inline-flex cursor-pointer items-center border border-amber-700/40 px-3 py-2 text-xs font-semibold text-amber-900">
+            <label className="inline-flex cursor-pointer items-center border border-ember-500/40 px-3 py-2 text-xs font-semibold text-ember-500">
               <input
                 type="file"
                 accept={CHARACTER_PORTRAIT_ALLOWED_MIME_TYPES.join(",")}
@@ -800,7 +803,7 @@ export function StoryCharacterModal({
       >
         <div className="flex items-center justify-between border-b border-clay-900/10 px-5 py-4 md:px-6">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-800/75">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ember-500/75">
               Playable Character
             </p>
             <h2 id="story-character-modal-title" className="mt-1 text-2xl font-semibold text-clay-900">本剧角色、状态立绘与配音</h2>
@@ -808,7 +811,7 @@ export function StoryCharacterModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center border border-clay-900/12 text-clay-500 transition-colors hover:border-amber-700/50 hover:text-amber-800"
+            className="flex h-10 w-10 items-center justify-center border border-clay-900/12 text-clay-500 transition-colors hover:border-ember-500/50 hover:text-ember-500"
             aria-label="关闭角色面板"
             title="关闭"
           >
@@ -829,8 +832,8 @@ export function StoryCharacterModal({
                 onClick={() => setTab(key as "story" | "mine" | "create")}
                 className={`mb-3 w-full border px-4 py-3 text-left transition-colors ${
                   tab === key
-                    ? "border-amber-700/55 bg-cream-50 text-amber-900"
-                    : "border-clay-900/10 text-clay-600 hover:border-amber-700/35"
+                    ? "border-ember-500/55 bg-cream-50 text-ember-500"
+                    : "border-clay-900/10 text-clay-600 hover:border-ember-500/35"
                 }`}
               >
                 <span className="block text-sm font-semibold">{label}</span>
@@ -858,7 +861,7 @@ export function StoryCharacterModal({
                 </div>
               ) : (
                 <div className="flex min-h-[360px] flex-col items-center justify-center border border-dashed border-clay-900/16 text-center">
-                  <i className="fa-solid fa-users-viewfinder text-3xl text-amber-800/65" />
+                  <i className="fa-solid fa-users-viewfinder text-3xl text-ember-500/65" />
                   <h3 className="mt-5 text-xl font-semibold text-clay-900">当前进度还没有可展示角色</h3>
                   <p className="mt-2 max-w-md text-sm leading-6 text-clay-500">
                     继续播放到角色登场后，这里会显示本剧角色、当前关系、状态立绘、配音声线和按进度更新的介绍。
@@ -876,7 +879,7 @@ export function StoryCharacterModal({
                 </div>
               ) : (
                 <div className="flex min-h-[360px] flex-col items-center justify-center border border-dashed border-clay-900/16 text-center">
-                  <i className="fa-solid fa-user-pen text-3xl text-amber-800/65" />
+                  <i className="fa-solid fa-user-pen text-3xl text-ember-500/65" />
                   <h3 className="mt-5 text-xl font-semibold text-clay-900">还没有自定义角色</h3>
                   <p className="mt-2 max-w-md text-sm leading-6 text-clay-500">
                     你可以先从本剧已登场角色复制设定，也可以直接创建一个角色进入后续测试。
@@ -884,7 +887,7 @@ export function StoryCharacterModal({
                   <button
                     type="button"
                     onClick={() => setTab("create")}
-                    className="mt-6 border border-amber-700/45 bg-amber-700 px-5 py-3 text-sm font-semibold text-cream-50"
+                    className="mt-6 border border-ember-500 bg-ember-500 px-5 py-3 text-sm font-semibold text-white"
                   >
                     创建我的角色
                   </button>
@@ -913,7 +916,7 @@ export function StoryCharacterModal({
                       value={form.role}
                       onChange={(e) => setForm((value) => ({ ...value, role: e.target.value }))}
                       placeholder="例如：女刺客、旧案记者、青梅竹马、边境城黑客"
-                      className="mt-2 w-full border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-amber-700/55"
+                      className="mt-2 w-full border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-ember-500/55"
                     />
                   </label>
                   <label className="block">
@@ -923,7 +926,7 @@ export function StoryCharacterModal({
                       onChange={(e) => setForm((value) => ({ ...value, description: e.target.value }))}
                       placeholder="写性格、关系、秘密、服装、当前剧情状态，以及要参与的剧情方向。"
                       rows={5}
-                      className="mt-2 w-full resize-none border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-amber-700/55"
+                      className="mt-2 w-full resize-none border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-ember-500/55"
                     />
                   </label>
                   <CharacterReferencePhotoField
@@ -940,7 +943,7 @@ export function StoryCharacterModal({
                       <input
                         value={form.visualStyle}
                         onChange={(e) => setForm((value) => ({ ...value, visualStyle: e.target.value }))}
-                        className="mt-2 w-full border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-amber-700/55"
+                        className="mt-2 w-full border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-ember-500/55"
                       />
                     </label>
                     <label className="block">
@@ -949,7 +952,7 @@ export function StoryCharacterModal({
                         value={form.voice}
                         onChange={(e) => setForm((value) => ({ ...value, voice: e.target.value }))}
                         placeholder="例如：低声克制、少年感、沙哑、有雨夜质感"
-                        className="mt-2 w-full border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-amber-700/55"
+                        className="mt-2 w-full border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-ember-500/55"
                       />
                     </label>
                   </div>
@@ -965,7 +968,7 @@ export function StoryCharacterModal({
                           type="checkbox"
                           checked={form.narratorVoice}
                           onChange={(e) => setForm((value) => ({ ...value, narratorVoice: e.target.checked }))}
-                          className="h-4 w-4 accent-amber-700"
+                          className="h-4 w-4 accent-ember-500"
                         />
                         旁白声线
                       </label>
@@ -1011,8 +1014,8 @@ export function StoryCharacterModal({
                         </select>
                       </label>
                     </div>
-                    <div className="mt-4 border border-amber-700/22 bg-cream-50 p-3">
-                      <p className="text-sm font-semibold text-amber-900">{matchedVoiceProfile.label}</p>
+                    <div className="mt-4 border border-ember-500/25 bg-cream-50 p-3">
+                      <p className="text-sm font-semibold text-ember-500">{matchedVoiceProfile.label}</p>
                       <p className="mt-1 text-xs leading-5 text-clay-500">{matchedVoiceProfile.timbre}</p>
                       <p className="mt-2 text-xs text-clay-500">
                         StepFun：{matchedVoiceProfile.stepfunVoiceId ?? "自动"} · 百炼：{matchedVoiceProfile.bailianVoiceId ?? "自动"}
@@ -1032,7 +1035,7 @@ export function StoryCharacterModal({
                     type="button"
                     onClick={createRole}
                     disabled={!form.name.trim()}
-                    className="border border-amber-700 bg-amber-700 px-6 py-3 font-semibold text-cream-50 transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
+                    className="border border-ember-500 bg-ember-500 px-6 py-3 font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     保存并进入当前剧情
                   </button>

@@ -35,7 +35,9 @@ import { UserChip } from "@/components/UserChip";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { MobileDreamFrameApp } from "@/components/MobileDreamFrameApp";
 import { CreditBalance } from "@/components/CreditBalance";
+import { PlatformGenerationNotice } from "@/components/PlatformGenerationNotice";
 import { UsageDisclosureNote } from "@/components/UsageDisclosureNote";
+import { WorldModelDemoShowcase } from "@/components/WorldModelDemoShowcase";
 import { useI18n } from "@/lib/i18n/client";
 import { useLocalePath } from "@/lib/i18n/hooks";
 import { loadStoryList } from "@/lib/clientStoryPersistence";
@@ -258,7 +260,7 @@ function StoryCard({
         className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
       />
       {assetStatus === "pending" && (
-        <span className="absolute left-3 top-3 border border-amber-200/40 bg-black/65 px-2.5 py-1 text-[10px] tracking-[0.14em] text-amber-100">
+        <span className="absolute left-3 top-3 border border-blue-300/40 bg-black/65 px-2.5 py-1 text-[10px] tracking-[0.14em] text-blue-100 xl:text-[11px]">
           画面待生成
         </span>
       )}
@@ -270,10 +272,10 @@ function StoryCard({
             "linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.45) 45%, rgba(0,0,0,0) 100%)",
         }}
       >
-        <h4 className="font-serif text-cream-50 text-base md:text-lg leading-snug mb-1 [text-shadow:0_1px_8px_rgba(20,10,4,0.7)]">
+        <h4 className="font-serif text-cream-50 text-base md:text-lg xl:text-[20px] leading-snug mb-1 [text-shadow:0_1px_8px_rgba(20,10,4,0.7)]">
           {title}
         </h4>
-        <p className="font-serif italic text-cream-50/95 text-xs md:text-[13px] leading-relaxed line-clamp-4 [text-shadow:0_1px_6px_rgba(20,10,4,0.6)]">
+        <p className="font-serif italic text-cream-50/95 text-xs md:text-[13px] xl:text-[14px] leading-relaxed line-clamp-4 [text-shadow:0_1px_6px_rgba(20,10,4,0.6)]">
           {outline}
         </p>
       </div>
@@ -323,8 +325,8 @@ function CategorySelect({
         onClick={onToggle}
         className="group flex items-center gap-2.5 pb-1.5 border-b border-clay-900/20 hover:border-clay-900/45 transition-colors"
       >
-        <span className="text-[10px] smallcaps text-clay-500">{label}</span>
-        <span className={"font-serif text-base md:text-lg " + (open ? "text-ember-500" : "text-clay-900")}>
+        <span className="text-[10px] smallcaps text-clay-500 xl:text-[11px]">{label}</span>
+        <span className={"font-serif text-base md:text-lg xl:text-xl " + (open ? "text-ember-500" : "text-clay-900")}>
           {itemLabels[value] ?? items[value]}
         </span>
         <i
@@ -342,7 +344,7 @@ function CategorySelect({
               type="button"
               onClick={() => onPick(i)}
               className={
-                "flex w-full items-center justify-between gap-3 px-4 py-1.5 text-sm font-serif transition-colors hover:bg-cream-100 " +
+                "flex w-full items-center justify-between gap-3 px-4 py-1.5 text-sm font-serif transition-colors hover:bg-cream-100 xl:text-[15.5px] xl:leading-[22px] " +
                 (i === value ? "text-ember-500" : "text-clay-700")
               }
             >
@@ -1453,9 +1455,20 @@ export default function HomePage() {
   return (
     <>
       <div className="md:hidden">
+        <div className="relative z-10 flex justify-end px-4 pt-3">
+          <Link
+            href={lp("/community")}
+            aria-label="共享故事社区"
+            title="共享故事社区"
+            className="inline-flex items-center gap-1 text-sm text-clay-500 hover:text-ember-500 transition-colors"
+          >
+            <i className="fa-solid fa-users" />
+            <span>共享故事社区</span>
+          </Link>
+        </div>
         <MobileDreamFrameApp />
       </div>
-      <div className={`hidden min-h-screen flex-col overflow-x-hidden transition-colors duration-300 md:flex ${theme === "night" ? "aistory-night" : ""}`}>
+      <div className={`hidden min-h-screen flex-col overflow-x-hidden transition-colors duration-300 md:flex ${theme === "night" ? "aistory-night" : "aistory-home-day"}`}>
       {/* ================== HEADER ================== */}
       <header className="mx-auto flex w-full max-w-[1640px] flex-wrap items-center justify-between gap-4 px-6 pt-7 md:px-16 md:pt-8">
         <span className="font-serif text-2xl md:text-[34px] leading-none tracking-tight text-clay-900">
@@ -1498,6 +1511,14 @@ export default function HomePage() {
               className="inline-flex text-base text-clay-500 hover:text-ember-500 transition-colors"
             >
               <i className="fa-solid fa-timeline" />
+            </Link>
+            <Link
+              href={lp("/community")}
+              aria-label="共享故事社区"
+              title="共享故事社区"
+              className="inline-flex text-base text-clay-500 hover:text-ember-500 transition-colors"
+            >
+              <i className="fa-solid fa-users" />
             </Link>
             <Link
               href={lp("/creator")}
@@ -1565,7 +1586,7 @@ export default function HomePage() {
       {/* ================== HERO 控制区（居中，呼应原型布局） ================== */}
       <section className="px-6 pb-8 pt-10 md:px-16 md:pb-9 md:pt-16">
         <div className="mx-auto max-w-[1100px] text-center">
-          <h1 className="font-serif font-light text-[32px] md:text-[56px] leading-[1.12] tracking-tight text-clay-900">
+          <h1 className="font-serif font-light text-[32px] md:text-[56px] xl:text-[62px] leading-[1.12] tracking-tight text-clay-900">
             {t("home.hero.title")}
           </h1>
 
@@ -1579,6 +1600,7 @@ export default function HomePage() {
           >
             <div className="relative text-left">
               <textarea
+                data-home-story-prompt
                 ref={inputRef}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
@@ -1591,10 +1613,10 @@ export default function HomePage() {
                 rows={1}
                 placeholder=" "
                 spellCheck={false}
-                className="block w-full resize-none overflow-hidden border-b border-clay-900/25 bg-transparent py-3 md:py-4 pr-48 md:pr-56 font-serif text-lg md:text-2xl lining-nums text-clay-900 outline-none transition-colors focus:border-ember-500"
+                className="block w-full resize-none overflow-hidden border-b border-clay-900/25 bg-transparent py-3 md:py-4 pr-48 md:pr-56 font-serif text-lg md:text-2xl xl:text-[26px] xl:leading-[35px] lining-nums text-clay-900 outline-none transition-colors focus:border-ember-500"
               />
               {!prompt && (
-                <div className="pointer-events-none absolute left-0 right-0 top-0 overflow-hidden whitespace-nowrap py-3 md:py-4 pr-48 md:pr-56 font-serif text-lg md:text-2xl text-clay-400">
+                <div className="pointer-events-none absolute left-0 right-0 top-0 overflow-hidden whitespace-nowrap py-3 md:py-4 pr-48 md:pr-56 font-serif text-lg md:text-2xl xl:text-[26px] xl:leading-[35px] text-clay-400">
                   <Typewriter
                     phrase={phrases[phraseIdx] ?? ""}
                     onCycle={() =>
@@ -1663,10 +1685,10 @@ export default function HomePage() {
                   className="h-12 w-16 flex-none rounded-sm object-cover"
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-medium text-clay-700">
+                  <p className="truncate text-xs font-medium text-clay-700 xl:text-[13px]">
                     已作为故事开局和画面参考
                   </p>
-                  <p className="mt-0.5 truncate text-[11px] text-clay-400">
+                  <p className="mt-0.5 truncate text-[11px] text-clay-400 xl:text-xs">
                     {imageStoryAnalysis?.setting || imageStoryAnalysis?.mood || imageStoryAnalysis?.stylePrompt || "后续画面会参考这张图"}
                   </p>
                 </div>
@@ -1681,17 +1703,17 @@ export default function HomePage() {
               </div>
             )}
             {imageStoryError && (
-              <p className="mt-2 text-right text-xs leading-relaxed text-ember-500">
+              <p className="mt-2 text-right text-xs leading-relaxed text-ember-500 xl:text-[13px]">
                 {imageStoryError}
               </p>
             )}
             {storyImportError && (
-              <p className="mt-2 text-right text-xs leading-relaxed text-ember-500">
+              <p className="mt-2 text-right text-xs leading-relaxed text-ember-500 xl:text-[13px]">
                 {storyImportError}
               </p>
             )}
             {prompt && (
-              <p className="mt-2 text-right text-xs text-clay-400">
+              <p className="mt-2 text-right text-xs text-clay-400 xl:text-[13px]">
                 {t("home.hero.enterHint")}
               </p>
             )}
@@ -1723,6 +1745,9 @@ export default function HomePage() {
             ))}
           </div>
 
+          {/* 平台积分生成状态：始终显示在可收起的提示卡之外，不随 hintClosed 隐藏。 */}
+          <PlatformGenerationNotice className="mx-auto mt-5 w-full max-w-full md:max-w-[1066px]" />
+
           <div
             data-home-information-card
             className="relative mx-auto mt-5 w-full max-w-full rounded-md border border-clay-900/10 bg-cream-100/50 px-6 py-4 text-left md:max-w-[1066px] md:px-8 md:py-5"
@@ -1730,7 +1755,7 @@ export default function HomePage() {
             {/* 可选引导沿用 localStorage:infiplot:hintClosed；强制调用披露始终保留。 */}
             {!hintClosed && (
               <>
-                <p className="pr-10 font-serif text-lg font-medium leading-7 text-clay-700 md:text-xl">
+                <p className="pr-10 font-serif text-lg font-medium leading-7 text-clay-700 md:text-xl xl:text-[22px] xl:leading-[31px]">
                   <span className="text-clay-800">AIstory</span>{" "}
                   {t("home.about.description")}
                 </p>
@@ -1753,13 +1778,13 @@ export default function HomePage() {
                 prefetchDepth={branchPrefetchDepth}
                 refreshKey={settingsOpen}
                 variant="plain"
-                className="text-xs leading-relaxed text-clay-600"
+                className="text-xs leading-relaxed text-clay-600 xl:text-[13px]"
               />
               {hintClosed && (
                 <button
                   type="button"
                   onClick={openHint}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-clay-900/10 bg-cream-50/70 px-3 py-1.5 text-xs font-medium text-clay-700 transition-colors hover:border-clay-900/20 hover:bg-cream-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember-500/50"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-clay-900/10 bg-cream-50/70 px-3 py-1.5 text-xs font-medium text-clay-700 transition-colors hover:border-clay-900/20 hover:bg-cream-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember-500/50 xl:text-[13px]"
                 >
                   <i className="fa-solid fa-chevron-down text-[10px]" aria-hidden="true" />
                   {t("home.hint.expand")}
@@ -1770,7 +1795,7 @@ export default function HomePage() {
             {!hintClosed && (
               <div className="mt-3 border-t border-clay-900/10 pt-3">
                 <p
-                  className="pr-6 font-serif text-[13px] leading-relaxed text-clay-500"
+                  className="pr-6 font-serif text-[13px] leading-relaxed text-clay-500 xl:text-[14.5px]"
                   dangerouslySetInnerHTML={{ __html: t("home.hint.text", { authEnabled: AUTH_ENABLED }) }}
                 />
               </div>
@@ -1778,6 +1803,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <WorldModelDemoShowcase />
 
       {/* ================== 统一瀑布流（每性向 30 篇预设剧情） ================== */}
       <section className="mx-auto w-full max-w-[1640px] px-6 pb-16 pt-7 md:px-16 md:pb-24 md:pt-10">
@@ -1804,8 +1831,8 @@ export default function HomePage() {
           <div className="mt-8 md:mt-10 border-t border-clay-900/10 pt-7 md:pt-8">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h2 className="font-serif text-2xl text-clay-900">我的剧集 / 继续观看</h2>
-                <p className="mt-1 text-sm text-clay-500">
+                <h2 className="font-serif text-2xl text-clay-900 xl:text-[26px]">我的剧集 / 继续观看</h2>
+                <p className="mt-1 text-sm text-clay-500 xl:text-[15.5px]">
                   这里显示用户自己生成的剧，以及看过但还没有读完的互动剧情。
                 </p>
               </div>
@@ -1826,13 +1853,13 @@ export default function HomePage() {
                         <span className="font-serif text-lg">{index + 1}</span>
                       </div>
                       <div className="min-w-0">
-                        <h3 className="truncate font-serif text-lg text-clay-900">{getStoryDisplayTitle(story)}</h3>
-                        <p className="text-xs text-clay-500">
+                        <h3 className="truncate font-serif text-lg text-clay-900 xl:text-[20px]">{getStoryDisplayTitle(story)}</h3>
+                        <p className="text-xs text-clay-500 xl:text-[13px]">
                           {story.sceneCount} 幕 · {formatHomeStoryTime(story, locale)}
                         </p>
                       </div>
                     </div>
-                    <span className="shrink-0 rounded-sm border border-clay-900/10 px-2 py-1 text-[10px] text-clay-500">
+                    <span className="shrink-0 rounded-sm border border-clay-900/10 px-2 py-1 text-[10px] text-clay-500 xl:text-[11px]">
                       未读完
                     </span>
                   </div>
@@ -1863,16 +1890,16 @@ export default function HomePage() {
         <div className="hairline-full mb-8 w-full md:mb-10" />
 
         <p
-          className="mx-auto max-w-3xl text-center font-sans text-xs md:text-[13px] leading-[1.85] text-clay-500"
+          className="mx-auto max-w-3xl text-center font-sans text-xs md:text-[13px] xl:text-[14.5px] leading-[1.85] text-clay-500"
           dangerouslySetInnerHTML={{ __html: t("home.about.legalNotice", { analyticsOn }) }}
         />
       </section>
 
       <footer className="mx-auto w-full max-w-[1640px] px-6 md:px-16 pb-10 mt-auto">
         <div className="hairline-full w-full mb-5" />
-        <div className="flex flex-col items-center gap-2 text-[10px] smallcaps text-clay-500">
+        <div className="flex flex-col items-center gap-2 text-[10px] smallcaps text-clay-500 xl:text-[11px]">
           <span>{t("home.about.copyright")}</span>
-          <span className="flex items-center gap-3 normal-case tracking-normal text-[11px]">
+          <span className="flex items-center gap-3 normal-case tracking-normal text-[11px] xl:text-xs">
             <a href={lp("/privacy")} className="hover:text-ember-500 transition-colors">{t("home.about.privacyPolicy")}</a>
             <span className="text-clay-300">·</span>
             <a href={lp("/terms")} className="hover:text-ember-500 transition-colors">{t("home.about.terms")}</a>

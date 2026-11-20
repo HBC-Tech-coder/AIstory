@@ -11,6 +11,8 @@ import {
 } from "@/lib/engine/speculativeBranchCache";
 import { authorizeCredentialAccess } from "@/lib/credentials/serverPolicy";
 import { requireUser } from "@/lib/supabase/guard";
+import { resolveLinkedPhoneForBilling } from "@/lib/billing/linkedBillingServer";
+import type { AiUserLinkedBillingPhoneUserId } from "@/lib/auth/aiUserLinkedBillingRepository";
 
 export const runtime = "nodejs";
 
@@ -38,10 +40,22 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+  let verifiedLinkedPhoneUserId: AiUserLinkedBillingPhoneUserId | undefined;
+  if (auth.authType === "aiuser") {
+    try {
+      const linked = await resolveLinkedPhoneForBilling(auth.aiuser);
+      if (linked.state === "linked") verifiedLinkedPhoneUserId = linked.phoneUserId;
+    } catch {
+      return NextResponse.json({ error: "关联账户计费暂不可用。", code: "LINKED_BILLING_UNAVAILABLE" },
+        { status: 503, headers: { "Cache-Control": "no-store" } });
+    }
+  }
   const credentialAccess = authorizeCredentialAccess({
     requestedMode: "platform_managed",
     hasByok: false,
     userId: auth.userId,
+    authType: auth.authType,
+    verifiedLinkedPhoneUserId,
   });
   if (!credentialAccess.allowed) {
     return NextResponse.json(

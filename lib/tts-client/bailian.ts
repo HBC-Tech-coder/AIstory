@@ -1,4 +1,5 @@
-﻿import type { CharacterVoice, CharacterVoiceProfile, TtsConfig } from "@infiplot/types";
+import type { CharacterVoice, CharacterVoiceProfile, TtsConfig } from "@infiplot/types";
+import { beginPlatformTtsAttempt } from "../billing/platformCostEnvelope";
 
 const DEFAULT_FEMALE_VOICE = "Cherry";
 const DEFAULT_MALE_VOICE = "Andre";
@@ -94,6 +95,11 @@ export async function bailianSynthesize(
     );
   }
 
+  const model = voice.model || cfg.speechModel;
+  // Platform scope: validate chars/bytes/model and consume one TTS attempt
+  // synchronously before the HTTP request. BYOK returns undefined.
+  beginPlatformTtsAttempt(cfg, text, model);
+
   const res = await fetch(joinUrl(cfg.baseUrl, "/services/aigc/multimodal-generation/generation"), {
     method: "POST",
     headers: {
@@ -101,7 +107,7 @@ export async function bailianSynthesize(
       Authorization: `Bearer ${cfg.apiKey}`,
     },
     body: JSON.stringify({
-      model: voice.model || cfg.speechModel,
+      model,
       input: {
         text,
         voice: voice.voiceId || cfg.voice || DEFAULT_FEMALE_VOICE,

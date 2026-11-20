@@ -11,10 +11,13 @@
 // (null / [] / false) and never throws.
 
 const DB_NAME = "infiplot";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
-/** The single object store holding story records (keyPath = "id"). */
-export const STORIES_STORE = "stories";
+const LEGACY_STORIES_STORE = "stories";
+/** Namespaced story records introduced for anonymous → account inheritance. */
+export const STORIES_STORE = "stories_v2";
+export const STORY_CLAIM_STAGING_STORE = "story_claim_staging";
+export const STORY_CLAIM_RECEIPTS_STORE = "story_claim_receipts";
 
 // Memoized open promise — opened once per page, reused thereafter.
 let dbPromise: Promise<IDBDatabase | null> | null = null;
@@ -23,14 +26,14 @@ function isAvailable(): boolean {
   return typeof window !== "undefined" && typeof indexedDB !== "undefined";
 }
 
-function promisifyRequest<T>(req: IDBRequest<T>): Promise<T> {
+export function idbRequest<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
 
-function txDone(tx: IDBTransaction): Promise<void> {
+export function idbTransactionDone(tx: IDBTransaction): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
@@ -54,8 +57,41 @@ export function idbReady(): Promise<IDBDatabase | null> {
       req.onupgradeneeded = () => {
         try {
           const db = req.result;
+          if (!db.objectStoreNames.contains(LEGACY_STORIES_STORE)) {
+            db.createObjectStore(LEGACY_STORIES_STORE, { keyPath: "id" });
+          }
           if (!db.objectStoreNames.contains(STORIES_STORE)) {
-            db.createObjectStore(STORIES_STORE, { keyPath: "id" });
+            const stories = db.createObjectStore(STORIES_STORE, {
+              keyPath: "storageKey",
+            });
+            if (db.objectStoreNames.contains(LEGACY_STORIES_STORE)) {
+              const legacy = req.transaction!.objectStore(LEGACY_STORIES_STORE);
+              legacy.openCursor().onsuccess = (event) => {
+                const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>)
+                  .result;
+                if (!cursor) return;
+                const value = cursor.value as Record<string, unknown>;
+                const id = typeof value.id === "string" ? value.id : "";
+                if (id) {
+                  stories.put({
+                    ...value,
+                    storageKey: `anonymous::${id}`,
+                    ownerNamespace: "anonymous",
+                  });
+                }
+                cursor.continue();
+              };
+            }
+          }
+          if (!db.objectStoreNames.contains(STORY_CLAIM_STAGING_STORE)) {
+            db.createObjectStore(STORY_CLAIM_STAGING_STORE, {
+              keyPath: "key",
+            });
+          }
+          if (!db.objectStoreNames.contains(STORY_CLAIM_RECEIPTS_STORE)) {
+            db.createObjectStore(STORY_CLAIM_RECEIPTS_STORE, {
+              keyPath: "claimId",
+            });
           }
         } catch {
           // createObjectStore failed (corrupt/quota/half-open) — the version-
@@ -117,7 +153,7 @@ export async function idbGet<T>(
     const db = await idbReady();
     if (!db) return null;
     const tx = db.transaction(storeName, "readonly");
-    const result = await promisifyRequest<T>(
+    const result = await idbRequest<T>(
       tx.objectStore(storeName).get(key) as IDBRequest<T>,
     );
     return result ?? null;
@@ -132,7 +168,7 @@ export async function idbGetAll<T>(storeName: string): Promise<T[]> {
     const db = await idbReady();
     if (!db) return [];
     const tx = db.transaction(storeName, "readonly");
-    const result = await promisifyRequest<T[]>(
+    const result = await idbRequest<T[]>(
       tx.objectStore(storeName).getAll() as IDBRequest<T[]>,
     );
     return result ?? [];
@@ -149,7 +185,7 @@ export async function idbCount(storeName: string): Promise<number> {
     const db = await idbReady();
     if (!db) return 0;
     const tx = db.transaction(storeName, "readonly");
-    const result = await promisifyRequest<number>(
+    const result = await idbRequest<number>(
       tx.objectStore(storeName).count() as IDBRequest<number>,
     );
     return result ?? 0;
@@ -158,14 +194,14 @@ export async function idbCount(storeName: string): Promise<number> {
   }
 }
 
-/** Upsert one record (keyPath "id"). Returns true on durable commit. */
+/** Upsert one record using the target store's keyPath. */
 export async function idbPut<T>(storeName: string, value: T): Promise<boolean> {
   try {
     const db = await idbReady();
     if (!db) return false;
     const tx = db.transaction(storeName, "readwrite");
     tx.objectStore(storeName).put(value);
-    await txDone(tx);
+    await idbTransactionDone(tx);
     return true;
   } catch {
     return false;
@@ -182,7 +218,7 @@ export async function idbDelete(
     if (!db) return false;
     const tx = db.transaction(storeName, "readwrite");
     tx.objectStore(storeName).delete(key);
-    await txDone(tx);
+    await idbTransactionDone(tx);
     return true;
   } catch {
     return false;

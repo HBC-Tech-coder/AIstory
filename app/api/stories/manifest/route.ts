@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/supabase/guard";
+import {
+  rejectUnboundCloudProgressPrincipal,
+  requireUser,
+} from "@/lib/supabase/guard";
 import { cloudStoryManifest } from "@/lib/persistence/cloudStore";
 
 export const runtime = "nodejs";
@@ -11,8 +14,10 @@ export const runtime = "nodejs";
 // open-source build (AUTH_ENABLED=false) cloudStoryManifest short-circuits to []
 // without ever constructing a Supabase client.
 export async function GET() {
-  const auth = await requireUser();
+  const auth = await requireUser({ allowAnonymousWhenAuthDisabled: true });
   if (auth instanceof NextResponse) return auth;
+  const principalRejection = rejectUnboundCloudProgressPrincipal(auth);
+  if (principalRejection) return principalRejection;
 
   const items = await cloudStoryManifest();
   return NextResponse.json(

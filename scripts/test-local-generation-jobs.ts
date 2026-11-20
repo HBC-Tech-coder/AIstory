@@ -35,9 +35,11 @@ const {
 const { GenerationJobScheduler } = await import(
   "../lib/generation-jobs/server.ts"
 );
-const { getStoredGenerationJob, saveStoredGenerationJob } = await import(
-  "../lib/generation-jobs/store.ts"
-);
+const {
+  getStoredGenerationJob,
+  hasActiveComfyUIWorkflowSelection,
+  saveStoredGenerationJob,
+} = await import("../lib/generation-jobs/store.ts");
 const { discoverComfyUIProviderStatus } = await import(
   "../lib/providers/comfyui/server.ts"
 );
@@ -374,6 +376,193 @@ assert.equal(completed?.status, "succeeded");
 assert.equal(completed?.artifact?.contentType, "image/png");
 assert.equal(promptSubmissions, 1);
 assert.equal(JSON.stringify(completed).includes("同一幂等生成"), false);
+assert.equal(JSON.stringify(completed).includes("workflowFingerprint"), false);
+const persistedCompleted = await getStoredGenerationJob(jobA.id);
+assert.match(persistedCompleted?.workflowFingerprint ?? "", /^[a-f0-9]{64}$/);
+
+const pinnedV1 = await getComfyUIWorkflowTemplate("portrait-safe");
+assert.ok(pinnedV1);
+if (!pinnedV1) throw new Error("Pinned workflow v1 is missing.");
+process.env.AISTORY_GENERATION_JOB_DIR = path.join(testRoot, "jobs-pinned-version");
+const pinnedNow = new Date().toISOString();
+await saveStoredGenerationJob({
+  id: "pinned-version-job",
+  provider: "comfyui",
+  modality: "image",
+  status: "queued",
+  progress: 0,
+  requestFingerprint: "pinned-version-request",
+  idempotencyKey: "pinned-version-idempotency",
+  workflowId: pinnedV1.template.id,
+  workflowVersion: pinnedV1.version.version,
+  workflowFingerprint: pinnedV1.version.fingerprint,
+  attempts: 0,
+  maxAttempts: 2,
+  retryable: false,
+  provenance: {
+    purpose: "foreground",
+    source: "aistory-studio",
+    provider: "comfyui",
+  },
+  createdAt: pinnedNow,
+  updatedAt: pinnedNow,
+  input: {
+    ...input,
+    prompt: "execute the pinned v1 workflow",
+    idempotencyKey: "pinned-version-idempotency",
+  },
+});
+const pinnedV3Workflow = structuredClone(workflow("v3"));
+const pinnedV3Nodes = pinnedV3Workflow.workflow as Record<string, unknown>;
+pinnedV3Nodes["output-v3"] = pinnedV3Nodes.output;
+delete pinnedV3Nodes.output;
+pinnedV3Workflow.outputNodeIds = ["output-v3"];
+const importedV3 = await importComfyUIWorkflowTemplate({
+  id: "portrait-safe",
+  name: "安全人像",
+  modality: "image",
+  enabled: true,
+  workflow: pinnedV3Workflow,
+});
+assert.equal(importedV3.activeVersion, 3);
+let pinnedPromptSubmissions = 0;
+const pinnedScheduler = new GenerationJobScheduler({
+  fetcher: (async (requestInput, init) => {
+    const url = String(requestInput);
+    assert.equal(init?.redirect, "error");
+    if (url.endsWith("/prompt")) {
+      pinnedPromptSubmissions += 1;
+      const body = JSON.parse(String(init?.body)) as {
+        prompt?: Record<string, unknown>;
+        extra_data?: { aistory?: { workflowVersion?: number } };
+      };
+      assert.equal(body.extra_data?.aistory?.workflowVersion, 1);
+      assert.equal("output" in (body.prompt ?? {}), true);
+      assert.equal("output-v3" in (body.prompt ?? {}), false);
+      return new Response(JSON.stringify({ prompt_id: "pinned-v1-prompt" }));
+    }
+    if (url.endsWith("/history/pinned-v1-prompt")) {
+      return new Response(JSON.stringify({
+        "pinned-v1-prompt": {
+          status: { completed: true },
+          outputs: {
+            output: {
+              images: [{ filename: "pinned.png", subfolder: "", type: "output" }],
+            },
+          },
+        },
+      }));
+    }
+    if (url.includes("/view?")) {
+      return new Response(new Uint8Array([137, 80, 78, 71]), {
+        headers: { "content-type": "image/png" },
+      });
+    }
+    throw new Error(`Unexpected pinned workflow URL: ${url}`);
+  }) as typeof fetch,
+  pollIntervalMs: 10,
+  maxPolls: 5,
+});
+await pinnedScheduler.initialize();
+for (let index = 0; index < 100; index += 1) {
+  if ((await pinnedScheduler.get("pinned-version-job"))?.status === "succeeded") {
+    break;
+  }
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
+assert.equal(
+  (await pinnedScheduler.get("pinned-version-job"))?.status,
+  "succeeded",
+);
+assert.equal(pinnedPromptSubmissions, 1);
+await configureComfyUIWorkflowTemplate("portrait-safe", { activeVersion: 1 });
+
+const occupancyJob = (
+  id: string,
+  status: "queued" | "running" | "pending" | "succeeded" | "failed" | "cancelled" | "interrupted",
+  workflowId = "portrait-safe",
+) => ({
+  id,
+  provider: "comfyui" as const,
+  modality: "image" as const,
+  status,
+  progress: 0,
+  requestFingerprint: `${id}-fingerprint`,
+  idempotencyKey: `${id}-idempotency`,
+  workflowId,
+  workflowVersion: 1,
+  attempts: 0,
+  maxAttempts: 2,
+  retryable: false,
+  provenance: {
+    purpose: "foreground" as const,
+    source: "aistory-studio" as const,
+    provider: "comfyui" as const,
+  },
+  createdAt: pinnedNow,
+  updatedAt: pinnedNow,
+  input: { ...input, workflowId, idempotencyKey: `${id}-idempotency` },
+});
+for (const status of ["queued", "running", "pending"] as const) {
+  process.env.AISTORY_GENERATION_JOB_DIR = path.join(
+    testRoot,
+    `jobs-occupancy-${status}`,
+  );
+  await saveStoredGenerationJob(occupancyJob(`occupancy-${status}`, status));
+  assert.equal(await hasActiveComfyUIWorkflowSelection("portrait-safe"), true);
+  assert.equal(await hasActiveComfyUIWorkflowSelection("other-workflow"), false);
+}
+process.env.AISTORY_GENERATION_JOB_DIR = path.join(
+  testRoot,
+  "jobs-occupancy-terminal",
+);
+for (const status of [
+  "succeeded",
+  "failed",
+  "cancelled",
+  "interrupted",
+] as const) {
+  await saveStoredGenerationJob(occupancyJob(`terminal-${status}`, status));
+}
+assert.equal(await hasActiveComfyUIWorkflowSelection("portrait-safe"), false);
+
+process.env.AISTORY_GENERATION_JOB_DIR = path.join(testRoot, "jobs-unpinned");
+await saveStoredGenerationJob({
+  ...occupancyJob("legacy-unpinned", "queued"),
+  workflowFingerprint: undefined,
+});
+await saveStoredGenerationJob({
+  ...occupancyJob("tampered-pin", "queued"),
+  workflowFingerprint: "0".repeat(64),
+});
+await saveStoredGenerationJob({
+  ...occupancyJob("missing-version", "queued"),
+  workflowVersion: 999,
+  workflowFingerprint: pinnedV1.version.fingerprint,
+});
+let invalidPinFetches = 0;
+const invalidPinScheduler = new GenerationJobScheduler({
+  fetcher: (async () => {
+    invalidPinFetches += 1;
+    throw new Error("Pinned-selection failures must precede provider fetch.");
+  }) as typeof fetch,
+  pollIntervalMs: 10,
+});
+await invalidPinScheduler.initialize();
+for (let index = 0; index < 100; index += 1) {
+  const jobs = await invalidPinScheduler.list();
+  if (jobs.length === 3 && jobs.every((job) => job.status === "failed")) break;
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
+const invalidPinJobs = await invalidPinScheduler.list();
+assert.equal(invalidPinJobs.length, 3);
+for (const invalidJob of invalidPinJobs) {
+  assert.equal(invalidJob.status, "failed");
+  assert.equal(invalidJob.errorCode, "workflow_selection_unavailable");
+  assert.equal(invalidJob.retryable, false);
+  assert.equal(JSON.stringify(invalidJob).includes("workflowFingerprint"), false);
+}
+assert.equal(invalidPinFetches, 0);
 
 process.env.AISTORY_GENERATION_JOB_DIR = path.join(testRoot, "jobs-race");
 let enterIdle!: () => void;

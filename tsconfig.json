@@ -55,6 +55,10 @@
     "node_modules",
     "dist",
     "scripts",
-    "experiments"
+    "experiments",
+    ".tmp",
+    "app/app",
+    "components/components",
+    "lib/lib"
   ]
 }

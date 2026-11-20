@@ -8,11 +8,16 @@ import {
 } from "@/lib/credentials/serverPolicy";
 import { requireUser } from "@/lib/supabase/guard";
 import {
+  markGenerationBillingOperationFailed,
+  markGenerationBillingProviderStarted,
+  markGenerationBillingProviderSucceeded,
   prepareGenerationBilling,
   refundGenerationBilling,
   settleGenerationBilling,
   type GenerationBillingContext,
 } from "@/lib/billing/generationGate";
+import { runInCostEnvelope } from "@/lib/billing/platformCostEnvelopeServer";
+import { isAuthoredAiContinuationAllowed } from "@/lib/case-studies/schema";
 
 export const runtime = "nodejs";
 
@@ -29,10 +34,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!body.session) {
+  if (
+    !body.session
+    || !Array.isArray(body.session.history)
+    || !Array.isArray(body.session.characters)
+  ) {
     return NextResponse.json(
       { error: "session is required" },
       { status: 400 },
+    );
+  }
+  if (
+    body.session.authoredStory?.authorLocked
+    && !isAuthoredAiContinuationAllowed(body.session.authoredStory)
+  ) {
+    return NextResponse.json(
+      { error: "作者锁定章节不允许请求 AI 视觉分支。" },
+      { status: 409 },
     );
   }
   if (
@@ -52,6 +70,21 @@ export async function POST(req: Request) {
   }
 
   const hasByok = hasByokPayload(body.byo);
+  let config: ReturnType<typeof loadEngineConfig>;
+  try {
+    if (hasByok) assertCompleteByok(body.byo);
+    const official = loadEngineConfig();
+    config = body.byo ? buildByoEngineConfig(body.byo, official) : official;
+  } catch {
+    return NextResponse.json(
+      {
+        error: hasByok
+          ? "Invalid BYO configuration."
+          : "Vision provider unavailable.",
+      },
+      { status: hasByok ? 400 : 503 },
+    );
+  }
   const auth = await requireUser();
   if (auth instanceof NextResponse) return auth;
   const preparedBilling = await prepareGenerationBilling({
@@ -59,25 +92,40 @@ export async function POST(req: Request) {
     auth,
     requestedMode: body.credentialMode,
     hasByok,
+    runtimeConfig: config,
     operation: "vision.decide",
   });
   if (preparedBilling instanceof NextResponse) return preparedBilling;
   const billing: GenerationBillingContext = preparedBilling;
 
   try {
-    if (hasByok) assertCompleteByok(body.byo);
-    const official = loadEngineConfig();
-    const config = body.byo ? buildByoEngineConfig(body.byo, official) : official;
-    const result = await visionDecide(config, body);
-    await settleGenerationBilling(billing);
+    const generate = async () => {
+      const result = await visionDecide(config, body, {
+        onProviderStarted: () => {
+          markGenerationBillingProviderStarted(billing);
+        },
+      });
+      return result;
+    };
+    let result: Awaited<ReturnType<typeof visionDecide>>;
+    try {
+      if (billing.reservation?.catalogEntry.pricingMode === "cost_beta_credit_v2") {
+        result = await runInCostEnvelope(config, "vision.decide", generate);
+      } else {
+        result = await generate();
+      }
+    } catch (error) {
+      markGenerationBillingOperationFailed(billing);
+      throw error;
+    }
+    markGenerationBillingProviderSucceeded(billing);
+    await settleGenerationBilling(billing, { requestSignal: req.signal });
     return NextResponse.json(result);
-  } catch (err) {
+  } catch {
     await refundGenerationBilling(
       billing,
       "Vision generation failed before settlement.",
     ).catch(() => undefined);
-    const message = err instanceof Error ? err.message : "Unknown error";
-    const status = message.includes("Invalid BYO") || message.includes("Missing BYO") ? 400 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: "Vision generation failed." }, { status: 500 });
   }
 }

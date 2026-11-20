@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import { cookies } from "next/headers";
 import type { AdminRepository } from "./repositories";
 import type { AtomicAdminMutation } from "./repositories";
 import {
@@ -8,7 +9,21 @@ import {
   LocalAdminRepository,
 } from "./localRepository";
 import { createSupabaseAdminRepository } from "./supabaseRepository";
+import {
+  INDEPENDENT_ADMIN_PRINCIPAL_PRODUCTION_COOKIE,
+  resolveIndependentAdminPrincipalAuthorizedContext,
+} from "./independentPrincipalServer";
 import { assertProductionDatabaseGateReady } from "@/lib/production/databaseGate";
+import {
+  assertFixedBetaPricingPolicy,
+  FixedBetaPricingContractError,
+  requiresFixedBetaPricingValidation,
+} from "@/lib/billing/fixedBetaPricing";
+import {
+  assertCostBetaPricingPolicy,
+  COST_BETA_PRICING_MODE,
+} from "@/lib/billing/costBetaPricing";
+import { inspectCostBetaPolicyCandidate } from "@/lib/billing/reconciliation";
 import type {
   AdminActor,
   AdminAuditLog,
@@ -139,12 +154,33 @@ export async function getAdminRepositoryForActor(
     return repository;
   }
 
+  if (actor.mode === "independent") {
+    const token = (await cookies()).get(
+      INDEPENDENT_ADMIN_PRINCIPAL_PRODUCTION_COOKIE,
+    )?.value;
+    const context = await resolveIndependentAdminPrincipalAuthorizedContext(
+      token,
+    );
+    if (!context || context.actor.mode !== "independent") {
+      throw new Error("Independent administrator session is unavailable.");
+    }
+    return createSupabaseAdminRepository(
+      actor,
+      {
+        kind: "independent",
+        databaseContext: context.databaseContext,
+        principalRepository: context.repository,
+      },
+      context.client,
+    );
+  }
+
   await (
     options?.assertProductionReady
     ?? (() => assertProductionDatabaseGateReady("identity"))
   )();
   const repository =
-    options?.productionRepository ?? createSupabaseAdminRepository();
+    options?.productionRepository ?? createSupabaseAdminRepository(actor);
   if (repository.source !== "supabase") {
     throw new Error("Production administrator repository mismatch.");
   }
@@ -329,7 +365,52 @@ export async function saveBillingPolicy(
   requestId: string,
 ): Promise<BillingPolicy> {
   assertActorRole(actor, ["super_admin", "finance"]);
-  if (!/^[A-Za-z0-9._-]{3,80}$/.test(input.version)) {
+  // Classify without executing accessors/proxies. A v2 claim is validated as a
+  // whole candidate; partial/malformed v2 content fails closed. Legacy
+  // provider-cost and fixed-beta v1 paths are unchanged.
+  const costBetaInspection = inspectCostBetaPolicyCandidate(input);
+  let fixedCandidate = false;
+  let costBetaCandidate = false;
+  let validatedCostBetaPolicy: BillingPolicy | undefined;
+  if (costBetaInspection.mode === "cost_beta_credit_v2") {
+    costBetaCandidate = true;
+    validatedCostBetaPolicy = costBetaInspection.policy;
+    try {
+      assertCostBetaPricingPolicy(validatedCostBetaPolicy);
+    } catch {
+      throw new Error("成本 β 定价合同无效");
+    }
+  } else if (costBetaInspection.mode === "invalid") {
+    throw new Error("成本 β 定价合同无效");
+  } else {
+    try {
+      fixedCandidate = requiresFixedBetaPricingValidation(input);
+      if (fixedCandidate) assertFixedBetaPricingPolicy(input);
+    } catch (error) {
+      if (error instanceof FixedBetaPricingContractError) {
+        throw new Error("固定测试定价合同无效");
+      }
+      throw error;
+    }
+  }
+  const installationBlocked =
+    process.env.AISTORY_PLATFORM_BILLING_ENABLED === "true"
+    || process.env.AISTORY_PLATFORM_MANAGED_ENABLED === "true";
+  if ((fixedCandidate || costBetaCandidate) && installationBlocked) {
+    throw new Error(
+      costBetaCandidate
+        ? "成本 β 测试定价只能在平台计费开关关闭时写入"
+        : "固定测试定价只能在平台计费开关关闭时写入",
+    );
+  }
+  // The validated v2 version pins a phase plus a 64-hex fingerprint, so it is
+  // legitimately longer than the legacy 80-character bound. Its exact content
+  // was already asserted above; only widen the length here.
+  if (
+    !(costBetaCandidate
+      ? /^[A-Za-z0-9._-]{3,160}$/.test(input.version)
+      : /^[A-Za-z0-9._-]{3,80}$/.test(input.version))
+  ) {
     throw new Error("定价版本格式无效");
   }
   if (
@@ -351,24 +432,43 @@ export async function saveBillingPolicy(
     || input.creditUnitsPerProviderMinor > 1_000_000
   ) throw new Error("积分换算单位无效");
   if (reason.trim().length < 3) throw new Error("必须填写定价变更原因");
+  if (!Array.isArray(input.entries)) throw new Error("模型价目表条目无效");
+  const allowsVersionedEntries = fixedCandidate || costBetaCandidate;
+  const operations = new Set<string>();
   for (const entry of input.entries) {
     if (
       !entry.operation.trim()
       || !entry.provider.trim()
       || !entry.model.trim()
       || !Number.isSafeInteger(entry.providerCostMinor)
-      || entry.providerCostMinor < (entry.enabled ? 1 : 0)
+      || (costBetaCandidate
+        ? entry.providerCostMinor < 0
+        : entry.providerCostMinor < (entry.enabled ? 1 : 0))
+      || operations.has(entry.operation)
+      || (
+        !allowsVersionedEntries
+        && entry.pricingMode !== undefined
+        && entry.pricingMode !== "provider_cost_v1"
+      )
+      || (!allowsVersionedEntries && entry.fixedCredits !== undefined)
     ) throw new Error("模型价目表条目无效");
+    operations.add(entry.operation);
   }
   const before = await repository.getBillingPolicy();
   const policy: BillingPolicy = {
-    ...input,
+    ...(validatedCostBetaPolicy ?? input),
     updatedAt: now(),
     updatedBy: actor.userId,
   };
+  // The production atomic RPC requires every mutation payload to carry the
+  // same server-owned tenant as the audit envelope. Add it only to the wire
+  // envelope, after the policy spread, so an input-supplied tenant can never
+  // override it. The DTO, fingerprint, returned policy, and local write stay
+  // tenant-free.
+  const mutationPayload = { ...policy, tenantId: TENANT };
   await persistAdminMutation(repository, actor, {
     kind: "billing_policy.save",
-    payload: policy,
+    payload: mutationPayload,
   }, {
     action: "billing.policy_save",
     targetType: "billing_policy",
@@ -384,6 +484,12 @@ export async function saveBillingPolicy(
       markupBasisPoints: policy.markupBasisPoints,
       initialGrantCredits: policy.initialGrantCredits,
       entries: policy.entries.length,
+      fixedEntries: policy.entries.filter(
+        (entry) => entry.pricingMode === "fixed_beta_credit_v1",
+      ).length,
+      costBetaEntries: policy.entries.filter(
+        (entry) => entry.pricingMode === COST_BETA_PRICING_MODE,
+      ).length,
     },
     reason,
     requestId,

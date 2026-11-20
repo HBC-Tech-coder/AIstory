@@ -1,5 +1,9 @@
 import OpenAI, { toFile, type Uploadable } from "openai";
 import type { Orientation, ProviderConfig, ProviderProtocol } from "@infiplot/types";
+import {
+  beginPlatformImageAttempt,
+  currentPlatformCostEnvelopeScope,
+} from "../billing/platformCostEnvelope";
 import { fetchWithRetry } from "./fetchWithRetry";
 import { normalizeBaseUrl } from "./normalizeUrl";
 
@@ -51,6 +55,10 @@ type DashscopeResponse = {
   message?: string;
   code?: string;
 };
+type OpenAiCompatibleImageResponse = {
+  error?: unknown;
+  data?: Array<{ url?: string }>;
+};
 
 export type GenerateImageOptions = {
   /**
@@ -85,6 +93,8 @@ export type GenerateImageOptions = {
   retries?: number;
   /** External cancellation, e.g. aborting the losing leg of a hedged race. */
   signal?: AbortSignal;
+  /** Server billing hook fired at the actual provider-request boundary. */
+  onProviderStarted?: () => void;
 };
 
 export type GenerateImageResult = {
@@ -133,22 +143,64 @@ function resolveImageProtocol(config: ProviderConfig): ProviderProtocol {
 //  GenerateImageResult). Dispatches on the resolved wire protocol.
 // ──────────────────────────────────────────────────────────────────────
 
+// Platform budget hook: the provider paths all call `onProviderStarted`
+// immediately before a real HTTP fetch (including each retry/hedge), so this
+// is the only correct place to consume an image attempt. Outside a platform
+// scope the options object is returned untouched; BYOK stays unchanged.
+function withPlatformImageBudget(
+  config: ProviderConfig,
+  prompt: string,
+  protocol: ProviderProtocol,
+  options: GenerateImageOptions | undefined,
+): GenerateImageOptions | undefined {
+  if (!currentPlatformCostEnvelopeScope()) return options;
+
+  const portrait = options?.orientation === "portrait";
+  const shape =
+    protocol === "dashscope"
+      ? { width: portrait ? 928 : 1664, height: portrait ? 1664 : 928 }
+      : protocol === "openai"
+        ? { width: portrait ? 1024 : 1536, height: portrait ? 1536 : 1024 }
+        : { width: portrait ? 1024 : 1792, height: portrait ? 1792 : 1024 };
+  const originalOnProviderStarted = options?.onProviderStarted;
+
+  return {
+    ...options,
+    onProviderStarted: () => {
+      // Throws before fetch when the config drifted, dimensions exceed the
+      // envelope, or the shared per-role attempt budget is exhausted.
+      beginPlatformImageAttempt(config, prompt, {
+        count: 1,
+        width: shape.width,
+        height: shape.height,
+      });
+      originalOnProviderStarted?.();
+    },
+  };
+}
+
 export async function generateImage(
   config: ProviderConfig,
   prompt: string,
   options?: GenerateImageOptions,
 ): Promise<GenerateImageResult> {
   const protocol = resolveImageProtocol(config);
+  const providerOptions = withPlatformImageBudget(
+    config,
+    prompt,
+    protocol,
+    options,
+  );
   switch (protocol) {
     case "openai":
-      return generateImageOpenAi(config, prompt, options);
+      return generateImageOpenAi(config, prompt, providerOptions);
     case "runware":
-      return generateImageRunware(config, prompt, options);
+      return generateImageRunware(config, prompt, providerOptions);
     case "dashscope":
-      return generateImageDashscope(config, prompt, options);
+      return generateImageDashscope(config, prompt, providerOptions);
     case "openai_compatible":
     default:
-      return generateImageOpenAiCompatible(config, prompt, options);
+      return generateImageOpenAiCompatible(config, prompt, providerOptions);
   }
 }
 
@@ -167,13 +219,17 @@ async function generateImageOpenAi(
     baseURL: normalizeBaseUrl(config.baseUrl, "openai"),
     maxRetries: 2,
     dangerouslyAllowBrowser: true,
+    fetch: async (input, init) => {
+      options?.onProviderStarted?.();
+      return globalThis.fetch(input, init);
+    },
   });
   const refs = (options?.referenceImages ?? []).slice(0, MAX_REFERENCE_IMAGES);
   const portrait = options?.orientation === "portrait";
   const size = portrait ? "1024x1536" : "1536x1024";
   const requestOptions = {
     signal: options?.signal,
-    timeout: options?.timeoutMs,
+    ...(options?.timeoutMs !== undefined ? { timeout: options.timeoutMs } : {}),
     ...(options?.retries !== undefined ? { maxRetries: options.retries } : {}),
   };
 
@@ -279,9 +335,7 @@ async function generateImageOpenAiCompatible(
 ): Promise<GenerateImageResult> {
   const base = normalizeBaseUrl(config.baseUrl, "openai_compatible");
   const endpoint = `${base}/images/generations`;
-  console.log(
-    `[ai-client] Calling OpenAI-compatible image generations at: ${endpoint} with model: ${config.model}`,
-  );
+  console.log("[ai-client] Calling configured OpenAI-compatible image provider.");
 
   const res = await fetchWithRetry(endpoint, {
     method: "POST",
@@ -299,18 +353,26 @@ async function generateImageOpenAiCompatible(
     retries: options?.retries,
     timeoutMs: options?.timeoutMs,
     signal: options?.signal,
+    onRequestStart: options?.onProviderStarted,
   });
 
   const text = await res.text();
-  let json: any;
+  let json: OpenAiCompatibleImageResponse;
   try {
-    json = JSON.parse(text);
+    json = JSON.parse(text) as OpenAiCompatibleImageResponse;
   } catch {
     throw new Error(`OpenAI Image API error ${res.status}: ${text.slice(0, 500)}`);
   }
 
   if (json.error) {
-    throw new Error(`OpenAI Image API error: ${json.error.message || JSON.stringify(json.error)}`);
+    const message =
+      typeof json.error === "object"
+      && json.error !== null
+      && "message" in json.error
+      && typeof json.error.message === "string"
+        ? json.error.message
+        : JSON.stringify(json.error);
+    throw new Error(`OpenAI Image API error: ${message}`);
   }
 
   const data = json.data?.[0];
@@ -360,6 +422,7 @@ async function generateImageDashscope(
     retries: options?.retries,
     timeoutMs: options?.timeoutMs,
     signal: options?.signal,
+    onRequestStart: options?.onProviderStarted,
   });
 
   const text = await res.text();
@@ -438,6 +501,7 @@ async function generateImageRunware(
     retries: options?.retries,
     timeoutMs: options?.timeoutMs,
     signal: options?.signal,
+    onRequestStart: options?.onProviderStarted,
   });
 
   const text = await res.text();

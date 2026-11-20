@@ -119,6 +119,52 @@ export async function listStoredGenerationJobs(): Promise<StoredGenerationJob[]>
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+const ACTIVE_COMFYUI_SELECTION_STATUSES = new Set([
+  "queued",
+  "running",
+  "pending",
+]);
+
+function storedComfyUIWorkflowId(job: StoredGenerationJob): string | undefined {
+  if (job.provider !== "comfyui") return undefined;
+  const input = job.input as { workflowId?: unknown } | undefined;
+  const storedId = typeof job.workflowId === "string" && job.workflowId.length > 0
+    ? job.workflowId
+    : undefined;
+  const inputId = typeof input?.workflowId === "string" && input.workflowId.length > 0
+    ? input.workflowId
+    : undefined;
+  if (storedId && inputId && storedId !== inputId) return undefined;
+  return storedId ?? inputId;
+}
+
+/**
+ * Side-effect-free local control-plane guard. It never initializes the
+ * scheduler or resumes queued work. An active legacy/malformed ComfyUI job
+ * whose workflow cannot be identified blocks every selection mutation.
+ */
+export async function hasActiveComfyUIWorkflowSelection(
+  workflowId: string,
+): Promise<boolean> {
+  if (!/^[a-z0-9][a-z0-9_-]{2,63}$/.test(workflowId)) {
+    throw new Error("Invalid workflow selection.");
+  }
+  const pendingMutation = mutationQueue;
+  await pendingMutation;
+  const jobs = (await readStore()).jobs;
+  for (const job of jobs) {
+    if (
+      job.provider !== "comfyui" ||
+      !ACTIVE_COMFYUI_SELECTION_STATUSES.has(job.status)
+    ) {
+      continue;
+    }
+    const selectedWorkflowId = storedComfyUIWorkflowId(job);
+    if (!selectedWorkflowId || selectedWorkflowId === workflowId) return true;
+  }
+  return false;
+}
+
 export async function getStoredGenerationJob(
   id: string,
 ): Promise<StoredGenerationJob | undefined> {

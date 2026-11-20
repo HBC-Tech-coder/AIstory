@@ -1,11 +1,10 @@
 import type { EngineConfig, ProviderProtocol } from "@infiplot/types";
 import type { ByokPersistence } from "@/lib/credentials/types";
 
-// Bring-your-own model keys — stored CLIENT-SIDE ONLY.
-//
-// When a user supplies their own text/image/vision API credentials, we persist
-// them in localStorage and the browser talks to providers directly. The keys
-// are therefore never sent to our server: no request body, no header, no log.
+// Device-BYOK model keys are stored client-side only. These helpers exclusively
+// implement the sessionStorage/localStorage path and never send keys anywhere.
+// The separate, explicit hosted-BYOK opt-in posts to a server-only vault API;
+// it must not reuse these persistence helpers or silently migrate old values.
 
 const STORAGE_KEY = "infiplot:model";
 const PERSISTENCE_KEY = "infiplot:byokPersistence";

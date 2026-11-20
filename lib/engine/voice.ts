@@ -58,11 +58,8 @@ export async function synthesizeBeat(
     );
     console.log(`  [voice ${beat.id}] synth=${Date.now() - t}ms`);
     return { base64: audioBase64, mime: mimeType };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(
-      `[voice] synth degraded for ${beat.id} (after ${Date.now() - t}ms): ${msg}`,
-    );
+  } catch {
+    console.error(`[voice] synth unavailable after ${Date.now() - t}ms; using silence.`);
     return null;
   }
 }

@@ -27,6 +27,9 @@ const dynamicImageWorkflow = {
       control_strength: 1,
       control_start: 0,
       control_end: 1,
+      identity_image: "",
+      pose_image: "",
+      face_reference: "",
     },
   },
   "custom-output": {

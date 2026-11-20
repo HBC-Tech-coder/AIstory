@@ -1,7 +1,6 @@
 import "server-only";
 
 import {
-  createClient,
   type SupabaseClient,
 } from "@supabase/supabase-js";
 import type {
@@ -27,17 +26,51 @@ import type {
   UserProjection,
   UserRoleRecord,
 } from "./types";
+import type {
+  IndependentAdminPrincipalDatabaseSessionContext,
+  SupabaseIndependentAdminPrincipalRepository,
+} from "./independentPrincipalRepository";
 import {
   assertProductionDatabaseGate,
+  createProductionSupabaseServiceClient,
   ProductionDatabaseGateError,
 } from "@/lib/production/databaseGate";
 
 type DbRow = Record<string, unknown>;
+type AdminSnapshotDataset =
+  | "users"
+  | "roles"
+  | "accounts"
+  | "ledger"
+  | "events"
+  | "settings"
+  | "payment_configs"
+  | "provider_configs"
+  | "domains"
+  | "channel_apps"
+  | "audit"
+  | "billing_policies";
+
+type LegacyProductionAdminContext = {
+  kind: "legacy";
+  actorId: string;
+  tenantId: string;
+};
+
+export type IndependentProductionAdminContext = {
+  kind: "independent";
+  databaseContext: IndependentAdminPrincipalDatabaseSessionContext;
+  principalRepository: SupabaseIndependentAdminPrincipalRepository;
+};
+
+type ProductionAdminContext =
+  | LegacyProductionAdminContext
+  | IndependentProductionAdminContext;
 
 const FALLBACK_BRANDING: PlatformBranding = {
   projectName: "AIstory",
   shortName: "AIstory",
-  primaryColor: "#8A5A2B",
+  primaryColor: "#315BFF",
   defaultLocale: "zh-CN",
   defaultInitialCredits: 1000,
 };
@@ -72,14 +105,6 @@ function stringArray(value: unknown): string[] {
     : [];
 }
 
-async function rows(
-  promise: PromiseLike<{ data: unknown; error: { message: string } | null }>,
-): Promise<DbRow[]> {
-  const result = await promise;
-  if (result.error) throw new ProductionDatabaseGateError();
-  return Array.isArray(result.data) ? result.data as DbRow[] : [];
-}
-
 async function write(
   promise: PromiseLike<{ error: { message: string } | null }>,
 ): Promise<void> {
@@ -89,11 +114,68 @@ async function write(
 
 export class SupabaseAdminRepository implements AdminRepository {
   readonly source = "supabase" as const;
+  private adminSnapshotPromise?: Promise<Record<string, unknown>>;
 
-  constructor(private readonly client: SupabaseClient) {}
+  constructor(
+    private readonly client: SupabaseClient,
+    private readonly adminContext?: ProductionAdminContext,
+  ) {}
+
+  private async adminSnapshot(): Promise<Record<string, unknown>> {
+    if (!this.adminContext) throw new ProductionDatabaseGateError();
+    this.adminSnapshotPromise ??= (async () => {
+      if (this.adminContext!.kind === "independent") {
+        return this.adminContext!.principalRepository.readAdminSnapshot(
+          this.adminContext!.databaseContext,
+        );
+      }
+      const result = await this.client.rpc("aistory_admin_read_snapshot", {
+        actor_user_id: this.adminContext!.actorId,
+        actor_tenant: this.adminContext!.tenantId,
+      });
+      if (result.error || !result.data || typeof result.data !== "object") {
+        throw new ProductionDatabaseGateError();
+      }
+      return result.data as Record<string, unknown>;
+    })();
+    return this.adminSnapshotPromise;
+  }
+
+  private async adminRows(dataset: AdminSnapshotDataset): Promise<DbRow[]> {
+    const snapshot = await this.adminSnapshot();
+    return Array.isArray(snapshot[dataset])
+      ? snapshot[dataset] as DbRow[]
+      : [];
+  }
+
+  private async serviceRows(
+    dataset: "user" | "account" | "ledger" | "settings" | "billing_policy",
+    subjectUserId?: string,
+  ): Promise<DbRow[]> {
+    const result = await this.client.rpc("aistory_service_read_dataset", {
+      target_tenant: "platform",
+      dataset,
+      subject_user_id: subjectUserId ?? null,
+    });
+    if (result.error) throw new ProductionDatabaseGateError();
+    return Array.isArray(result.data) ? result.data as DbRow[] : [];
+  }
+
+  private invalidateAdminSnapshot(): void {
+    this.adminSnapshotPromise = undefined;
+  }
+
+  private assertAdminMutationAllowed(): void {
+    if (this.adminContext?.kind === "independent") {
+      throw new Error(
+        "Independent administrator control-plane mutations are unavailable.",
+      );
+    }
+  }
 
   async listUsers(): Promise<UserProjection[]> {
-    const data = await rows(this.client.from("profiles").select("*"));
+    if (!this.adminContext) throw new ProductionDatabaseGateError();
+    const data = await this.adminRows("users");
     return data.map((row) => ({
       userId: stringValue(row.user_id),
       tenantId: stringValue(row.tenant_id),
@@ -115,7 +197,30 @@ export class SupabaseAdminRepository implements AdminRepository {
   }
 
   async getUser(userId: string): Promise<UserProjection | undefined> {
-    return (await this.listUsers()).find((user) => user.userId === userId);
+    const data = this.adminContext
+      ? await this.adminRows("users")
+      : await this.serviceRows("user", userId);
+    const row = data.find((item) => stringValue(item.user_id) === userId);
+    return row ? {
+      userId: stringValue(row.user_id),
+      tenantId: stringValue(row.tenant_id),
+      ...(optionalString(row.channel_id)
+        ? { channelId: stringValue(row.channel_id) }
+        : {}),
+      displayName: stringValue(row.display_name),
+      ...(optionalString(row.masked_contact)
+        ? { maskedContact: stringValue(row.masked_contact) }
+        : {}),
+      status: row.status as UserProjection["status"],
+      userType: row.user_type as UserProjection["userType"],
+      ...(optionalString(row.locale) ? { locale: stringValue(row.locale) } : {}),
+      ...(optionalString(row.region) ? { region: stringValue(row.region) } : {}),
+      tags: stringArray(row.tags),
+      createdAt: stringValue(row.created_at),
+      ...(optionalString(row.last_seen_at)
+        ? { lastSeenAt: stringValue(row.last_seen_at) }
+        : {}),
+    } : undefined;
   }
 
   async saveUser(_user: UserProjection): Promise<void> {
@@ -124,9 +229,10 @@ export class SupabaseAdminRepository implements AdminRepository {
   }
 
   async listRoles(userId?: string): Promise<UserRoleRecord[]> {
-    let query = this.client.from("user_roles").select("*");
-    if (userId) query = query.eq("user_id", userId);
-    const data = await rows(query);
+    if (!this.adminContext) throw new ProductionDatabaseGateError();
+    const data = (await this.adminRows("roles")).filter(
+      (row) => !userId || stringValue(row.user_id) === userId,
+    );
     return data.map((row) => ({
       userId: stringValue(row.user_id),
       tenantId: stringValue(row.tenant_id),
@@ -145,14 +251,13 @@ export class SupabaseAdminRepository implements AdminRepository {
     userId: string,
     tenantId: string,
   ): Promise<CreditAccount | undefined> {
-    const data = await rows(
-      this.client
-        .from("credit_accounts")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("tenant_id", tenantId)
-        .limit(1),
-    );
+    const data = this.adminContext
+      ? (await this.adminRows("accounts")).filter(
+          (row) =>
+            stringValue(row.user_id) === userId
+            && stringValue(row.tenant_id) === tenantId,
+        )
+      : await this.serviceRows("account", userId);
     const row = data[0];
     return row ? {
       id: stringValue(row.id),
@@ -169,9 +274,15 @@ export class SupabaseAdminRepository implements AdminRepository {
   }
 
   async listLedger(userId?: string): Promise<ServerCreditLedgerEntry[]> {
-    let query = this.client.from("credit_ledger").select("*");
-    if (userId) query = query.eq("user_id", userId);
-    const data = await rows(query);
+    const data = this.adminContext
+      ? (await this.adminRows("ledger")).filter(
+          (row) => !userId || stringValue(row.user_id) === userId,
+        )
+      : userId
+        ? await this.serviceRows("ledger", userId)
+        : (() => {
+            throw new ProductionDatabaseGateError();
+          })();
     return data.map((row) => ({
       id: stringValue(row.id),
       accountId: stringValue(row.account_id),
@@ -258,6 +369,7 @@ export class SupabaseAdminRepository implements AdminRepository {
       }
       throw new ProductionDatabaseGateError();
     }
+    this.invalidateAdminSnapshot();
     const current = (await this.listLedger(entry.userId)).find(
       (item) => item.tenantId === entry.tenantId
         && item.idempotencyKey === entry.idempotencyKey,
@@ -301,6 +413,7 @@ export class SupabaseAdminRepository implements AdminRepository {
       },
     });
     if (result.error) throw new ProductionDatabaseGateError();
+    this.invalidateAdminSnapshot();
     const current = (await this.listLedger(entry.userId)).find(
       (item) =>
         item.tenantId === entry.tenantId
@@ -314,6 +427,7 @@ export class SupabaseAdminRepository implements AdminRepository {
   async adjustCreditsAtomically(
     input: AtomicCreditAdjustmentInput,
   ): Promise<AtomicCreditAdjustmentResult> {
+    this.assertAdminMutationAllowed();
     const result = await this.client.rpc("aistory_admin_adjust_credits", {
       adjustment: {
         actor_id: input.actor.userId,
@@ -328,6 +442,7 @@ export class SupabaseAdminRepository implements AdminRepository {
     if (result.error) {
       throw new Error("Production credit adjustment is unavailable.");
     }
+    this.invalidateAdminSnapshot();
     const payload = result.data && typeof result.data === "object"
       ? result.data as Record<string, unknown>
       : {};
@@ -352,6 +467,7 @@ export class SupabaseAdminRepository implements AdminRepository {
     mutation: AtomicAdminMutation,
     audit: AdminAuditLog,
   ): Promise<void> {
+    this.assertAdminMutationAllowed();
     const result = await this.client.rpc("aistory_admin_apply_mutation", {
       mutation,
       audit: {
@@ -371,9 +487,11 @@ export class SupabaseAdminRepository implements AdminRepository {
     if (result.error || result.data !== true) {
       throw new Error("Production admin mutation is unavailable.");
     }
+    this.invalidateAdminSnapshot();
   }
 
   async appendEvent(event: GameplayEvent): Promise<void> {
+    this.assertAdminMutationAllowed();
     await write(this.client.from("gameplay_events").upsert({
       id: event.id,
       tenant_id: event.tenantId,
@@ -401,10 +519,12 @@ export class SupabaseAdminRepository implements AdminRepository {
       error_code: event.errorCode,
       created_at: event.createdAt,
     }));
+    this.invalidateAdminSnapshot();
   }
 
   async listEvents(): Promise<GameplayEvent[]> {
-    const data = await rows(this.client.from("gameplay_events").select("*"));
+    if (!this.adminContext) throw new ProductionDatabaseGateError();
+    const data = await this.adminRows("events");
     return data.map((row) => ({
       id: stringValue(row.id),
       tenantId: stringValue(row.tenant_id),
@@ -520,7 +640,9 @@ export class SupabaseAdminRepository implements AdminRepository {
   }
 
   async listSettingsVersions(): Promise<PlatformSettingsVersion[]> {
-    const data = await rows(this.client.from("platform_settings").select("*"));
+    const data = this.adminContext
+      ? await this.adminRows("settings")
+      : await this.serviceRows("settings");
     return data.map((row) => ({
       id: stringValue(row.id),
       tenantId: stringValue(row.tenant_id),
@@ -542,7 +664,8 @@ export class SupabaseAdminRepository implements AdminRepository {
   }
 
   async listPaymentConfigs(): Promise<PaymentProviderConfig[]> {
-    const data = await rows(this.client.from("payment_provider_configs").select("*"));
+    if (!this.adminContext) throw new ProductionDatabaseGateError();
+    const data = await this.adminRows("payment_configs");
     return data.map((row) => ({
       id: stringValue(row.id),
       tenantId: stringValue(row.tenant_id),
@@ -567,7 +690,8 @@ export class SupabaseAdminRepository implements AdminRepository {
   }
 
   async listProviderConfigs(): Promise<PlatformProviderConfig[]> {
-    const data = await rows(this.client.from("platform_provider_configs").select("*"));
+    if (!this.adminContext) throw new ProductionDatabaseGateError();
+    const data = await this.adminRows("provider_configs");
     return data.map((row) => ({
       id: stringValue(row.id),
       tenantId: stringValue(row.tenant_id),
@@ -592,7 +716,8 @@ export class SupabaseAdminRepository implements AdminRepository {
     throw new Error("Use the transactional production admin mutation RPC.");
   }
   async listDomains(): Promise<DomainBinding[]> {
-    const data = await rows(this.client.from("domain_bindings").select("*"));
+    if (!this.adminContext) throw new ProductionDatabaseGateError();
+    const data = await this.adminRows("domains");
     return data.map((row) => ({
       id: stringValue(row.id),
       tenantId: stringValue(row.tenant_id),
@@ -614,7 +739,8 @@ export class SupabaseAdminRepository implements AdminRepository {
   }
 
   async listChannelApps(): Promise<ChannelApp[]> {
-    const data = await rows(this.client.from("channel_apps").select("*"));
+    if (!this.adminContext) throw new ProductionDatabaseGateError();
+    const data = await this.adminRows("channel_apps");
     return data.map((row) => ({
       id: stringValue(row.id),
       tenantId: stringValue(row.tenant_id),
@@ -678,14 +804,9 @@ export class SupabaseAdminRepository implements AdminRepository {
   }
 
   async getBillingPolicy(): Promise<BillingPolicy> {
-    const data = await rows(
-      this.client
-        .from("billing_policies")
-        .select("*")
-        .eq("tenant_id", "platform")
-        .order("updated_at", { ascending: false })
-        .limit(1),
-    );
+    const data = this.adminContext
+      ? await this.adminRows("billing_policies")
+      : await this.serviceRows("billing_policy");
     const row = data[0];
     if (!row) return FALLBACK_BILLING_POLICY;
     return {
@@ -715,11 +836,8 @@ export class SupabaseAdminRepository implements AdminRepository {
   }
 
   async listAudit(): Promise<AdminAuditLog[]> {
-    const data = await rows(
-      this.client.from("admin_audit_logs").select("*").order("created_at", {
-        ascending: false,
-      }),
-    );
+    if (!this.adminContext) throw new ProductionDatabaseGateError();
+    const data = await this.adminRows("audit");
     return data.map((row) => ({
       id: stringValue(row.id),
       tenantId: stringValue(row.tenant_id),
@@ -748,14 +866,18 @@ export class SupabaseAdminRepository implements AdminRepository {
   }
 }
 
-export function createSupabaseAdminRepository(): SupabaseAdminRepository {
+export function createSupabaseAdminRepository(
+  actor?: AdminActor,
+  independentContext?: IndependentProductionAdminContext,
+  clientOverride?: SupabaseClient,
+): SupabaseAdminRepository {
   assertProductionDatabaseGate("identity");
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceRoleKey) {
-    throw new Error("Supabase admin repository is not configured");
-  }
-  return new SupabaseAdminRepository(createClient(url, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  }));
+  return new SupabaseAdminRepository(
+    clientOverride ?? createProductionSupabaseServiceClient(),
+    actor?.mode === "production"
+      ? { kind: "legacy", actorId: actor.userId, tenantId: "platform" }
+      : actor?.mode === "independent"
+        ? independentContext
+        : undefined,
+  );
 }

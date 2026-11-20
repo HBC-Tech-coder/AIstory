@@ -238,8 +238,38 @@ export class AuthRequiredError extends Error {
   }
 }
 
+export class GenerationRequestError extends Error {
+  readonly code?: string;
+  readonly status: number;
+
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+  ) {
+    super(message);
+    this.name = "GenerationRequestError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+const PLATFORM_GENERATION_UNAVAILABLE_CODES = new Set([
+  "PLATFORM_MANAGED_DISABLED",
+  "PLATFORM_MANAGED_FORBIDDEN",
+  "PLATFORM_PRICING_UNAVAILABLE",
+  "PRODUCTION_DATABASE_GATE_UNAVAILABLE",
+]);
+
+export function isPlatformGenerationUnavailable(error: unknown): boolean {
+  return error instanceof GenerationRequestError
+    && !!error.code
+    && PLATFORM_GENERATION_UNAVAILABLE_CODES.has(error.code);
+}
+
 type ErrorPayload = {
   error?: string;
+  code?: string;
   quote?: AuthRequiredError["quote"];
 };
 
@@ -272,9 +302,8 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
     if (res.status === 401) {
       throw new AuthRequiredError(data.error, data.quote);
     }
-    let message = `HTTP ${res.status}`;
-    if (data.error) message = data.error;
-    throw new Error(message);
+    const message = data.error || `HTTP ${res.status}`;
+    throw new GenerationRequestError(message, res.status, data.code);
   }
   return res.json() as Promise<T>;
 }
@@ -344,9 +373,8 @@ async function fetchSSE<T>(
     if (res.status === 401) {
       throw new AuthRequiredError(data.error, data.quote);
     }
-    let message = `HTTP ${res.status}`;
-    if (data.error) message = data.error;
-    throw new Error(message);
+    const message = data.error || `HTTP ${res.status}`;
+    throw new GenerationRequestError(message, res.status, data.code);
   }
 
   if (!emit || !res.headers.get("content-type")?.includes("text/event-stream")) {

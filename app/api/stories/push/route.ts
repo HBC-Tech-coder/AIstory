@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { coerceOrientation } from "@infiplot/types";
-import { requireUser } from "@/lib/supabase/guard";
+import {
+  rejectUnboundCloudProgressPrincipal,
+  requireUser,
+} from "@/lib/supabase/guard";
 import { cloudSaveStory } from "@/lib/persistence/cloudStore";
 import { coerceEpoch, type StorySyncEnvelope } from "@/lib/persistence/types";
 
@@ -18,6 +21,8 @@ const MAX_PUSH_BYTES = 12_000_000;
 export async function POST(req: Request) {
   const auth = await requireUser();
   if (auth instanceof NextResponse) return auth;
+  const principalRejection = rejectUnboundCloudProgressPrincipal(auth);
+  if (principalRejection) return principalRejection;
 
   // Pre-check Content-Length to reject an oversized body before buffering it.
   // The post-read byteLength check below still covers chunked/omitted headers.

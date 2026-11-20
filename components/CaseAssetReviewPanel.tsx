@@ -55,8 +55,8 @@ function ReviewAssetCard({
     ["公开安全", item.review.publicSafety],
   ];
   return (
-    <article className="min-w-0 border border-[#6f4f2f]/18 bg-[#fffdf8]">
-      <div className="aspect-video overflow-hidden bg-[#241f19]">
+    <article className="ui-surface min-w-0 border">
+      <div className="aspect-video overflow-hidden bg-[#07132f]">
         {item.modality === "video" ? (
           <video
             src={item.previewUrl}
@@ -78,7 +78,7 @@ function ReviewAssetCard({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <h2 className="truncate font-serif text-lg">{item.label}</h2>
-            <p className="mt-0.5 text-[11px] text-[#7b6954]">
+            <p className="ui-muted mt-0.5 text-[11px]">
               {item.modality === "video" ? "视频" : "图片"} · {item.width}×
               {item.height}
               {item.durationSeconds ? ` · ${item.durationSeconds.toFixed(2)} 秒` : ""}
@@ -101,7 +101,7 @@ function ReviewAssetCard({
             </span>
           ))}
         </div>
-        <p className="mt-3 min-h-12 text-xs leading-5 text-[#665746]">
+        <p className="ui-copy mt-3 min-h-12 text-xs leading-5">
           {item.review.notes || "尚无审核备注。"}
         </p>
         <div className="mt-3 grid grid-cols-3 gap-1.5">
@@ -117,7 +117,7 @@ function ReviewAssetCard({
               type="button"
               disabled={busy || item.review.publicationStatus === decision}
               onClick={() => onDecision(item, decision)}
-              className="min-h-9 border border-[#8a5a2b]/35 px-1 text-[11px] text-[#70471f] hover:bg-[#8a5a2b]/8 disabled:opacity-40"
+              className="ui-button-secondary min-h-9 border px-1 text-[11px]"
             >
               {label}
             </button>
@@ -207,14 +207,14 @@ export function CaseAssetReviewPanel() {
 
   return (
     <div className="min-h-[calc(100vh-65px)]">
-      <header className="border-b border-[#6f4f2f]/15 bg-white/45 px-4 py-4 lg:px-6">
+      <header className="ui-surface border-b px-4 py-4 lg:px-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold uppercase text-[#9b6a32]">
+            <p className="ui-primary text-[11px] font-semibold uppercase">
               AIstory Local Review
             </p>
             <h1 className="mt-1 font-serif text-2xl">《她不在出厂设定里》案例审片</h1>
-            <p className="mt-1 max-w-3xl text-xs leading-5 text-[#756552]">
+            <p className="ui-muted mt-1 max-w-3xl text-xs leading-5">
               候选素材仅保存在本机作者锁定目录。审核标签不会自动改写公开
               story.json，也不会把原始人脸参考、提示词或本地路径暴露给玩家。
             </p>
@@ -223,7 +223,7 @@ export function CaseAssetReviewPanel() {
             type="button"
             onClick={() => void refresh()}
             disabled={loading}
-            className="inline-flex h-9 items-center gap-2 border border-[#8a5a2b]/35 px-3 text-xs text-[#70471f] disabled:opacity-45"
+            className="ui-button-secondary inline-flex h-9 items-center gap-2 border px-3 text-xs"
           >
             <i className={`fa-solid fa-rotate ${loading ? "animate-spin" : ""}`} />
             刷新清单
@@ -243,7 +243,7 @@ export function CaseAssetReviewPanel() {
       </header>
 
       <div className="px-4 py-4 lg:px-6">
-        <div className="flex max-w-full gap-1 overflow-x-auto border-b border-[#6f4f2f]/15 pb-2">
+        <div className="ui-border flex max-w-full gap-1 overflow-x-auto border-b pb-2">
           {FILTERS.map((item) => (
             <button
               key={item.id}
@@ -251,8 +251,8 @@ export function CaseAssetReviewPanel() {
               onClick={() => setFilter(item.id)}
               className={`shrink-0 border px-3 py-2 text-xs ${
                 filter === item.id
-                  ? "border-[#8a5a2b] bg-[#8a5a2b] text-white"
-                  : "border-[#8a5a2b]/25 bg-white/55 text-[#70471f]"
+                  ? "border-ember-500 bg-ember-500 text-white"
+                  : "border-ember-500/25 bg-cream-50/70 text-clay-700"
               }`}
             >
               {item.label}
@@ -260,16 +260,16 @@ export function CaseAssetReviewPanel() {
           ))}
         </div>
         {message && (
-          <p className="mt-3 border border-[#8a5a2b]/20 bg-white/55 px-3 py-2 text-xs text-[#70471f]">
+          <p className="mt-3 border border-ember-500/20 bg-cream-50/70 px-3 py-2 text-xs text-clay-700">
             {message}
           </p>
         )}
         {loading && !snapshot ? (
-          <div className="mt-4 border border-dashed border-[#6f4f2f]/25 p-8 text-center text-sm text-[#756552]">
+          <div className="ui-muted ui-border mt-4 border border-dashed p-8 text-center text-sm">
             正在读取本机审核清单…
           </div>
         ) : visibleItems.length === 0 ? (
-          <div className="mt-4 border border-dashed border-[#6f4f2f]/25 p-8 text-center text-sm text-[#756552]">
+          <div className="ui-muted ui-border mt-4 border border-dashed p-8 text-center text-sm">
             当前筛选没有素材。
           </div>
         ) : (

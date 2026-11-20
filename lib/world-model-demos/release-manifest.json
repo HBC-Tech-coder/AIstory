@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "derivatives": [
+    {
+      "id": "world-model-anime-sunset",
+      "publicVideo": {
+        "url": "/case-studies/world-model-anime-sunset/assets/demo.mp4",
+        "bytes": 18045043,
+        "sha256": "b56955c2c45d6d71e99054d25e5be5573c0b9a43811ed4c0940476ad91d11447"
+      }
+    },
+    {
+      "id": "world-model-close-encounter",
+      "publicVideo": {
+        "url": "/case-studies/world-model-close-encounter/assets/demo.mp4",
+        "bytes": 23286582,
+        "sha256": "4b8dbdd505b587f55de476d7bb6d030e422a2f9654c82bcdf7101825984a3dfd"
+      }
+    },
+    {
+      "id": "world-model-midnight-heartbeat",
+      "publicVideo": {
+        "url": "/case-studies/world-model-midnight-heartbeat/assets/demo.mp4",
+        "bytes": 11512249,
+        "sha256": "0b780107a72a33ba53946c6f8091575bb49bf68839e10b2a6773ffd07ad69336"
+      }
+    },
+    {
+      "id": "world-model-little-chef",
+      "publicVideo": {
+        "url": "/case-studies/world-model-little-chef/assets/demo.mp4",
+        "bytes": 6601802,
+        "sha256": "aa9e676f730c1472ed10cc3f042d21587679d721bbbfaa1f4bf6854a264fe8dd"
+      }
+    },
+    {
+      "id": "world-model-forest-friend",
+      "publicVideo": {
+        "url": "/case-studies/world-model-forest-friend/assets/demo.mp4",
+        "bytes": 30422015,
+        "sha256": "33edf3deb36d2f6d49a6d5c7eb2408cfb22ef34b9d3f21b67429936868bb90dd"
+      }
+    }
+  ]
+}

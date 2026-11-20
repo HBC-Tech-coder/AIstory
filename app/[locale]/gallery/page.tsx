@@ -26,6 +26,7 @@ import {
   renderPersonalizedSpeaker,
   renderPersonalizedText,
 } from "@/lib/personalization";
+import { resolveGalleryStageMetrics } from "@/lib/playerReviewPolicy";
 
 // ──────────────────────────────────────────────────────────────────────
 //  Gallery — an offline-only replay of a played session. Entered from
@@ -208,8 +209,8 @@ function DialoguePanel({
         className={`w-full ${portrait ? "max-w-[92vw]" : "max-w-2xl"} max-h-[80dvh] overflow-hidden`}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "rgba(14, 10, 6, 0.92)",
-          border: "1.5px solid rgba(175, 138, 72, 0.72)",
+          background: "rgba(3, 8, 22, 0.94)",
+          border: "1.5px solid rgba(88, 120, 255, 0.62)",
           borderRadius: "6px",
           backdropFilter: "blur(14px)",
           WebkitBackdropFilter: "blur(14px)",
@@ -249,7 +250,7 @@ function DialoguePanel({
                       第 {String(i + 1).padStart(2, "0")} 拍
                     </span>
                     {beat.speaker && (
-                      <span className="font-serif text-[12px] text-[rgba(205,165,90,0.92)]">
+                      <span className="font-serif text-[12px] text-[rgba(151,174,255,0.92)]">
                         {renderPersonalizedSpeaker(beat.speaker, playerName, defaultPlayerName)}
                       </span>
                     )}
@@ -257,7 +258,7 @@ function DialoguePanel({
                   {body && (
                     <p
                       className={`font-serif leading-[1.75] ${portrait ? "text-[15px]" : "text-[13px]"}`}
-                      style={{ color: "rgba(245,235,210,0.94)" }}
+                      style={{ color: "rgba(245,248,255,0.94)" }}
                     >
                       {renderPersonalizedText(body, playerName, defaultPlayerName)}
                     </p>
@@ -265,7 +266,7 @@ function DialoguePanel({
                   {narration && (
                     <p
                       className={`mt-1 font-serif italic leading-[1.65] ${portrait ? "text-[13px]" : "text-[12px]"}`}
-                      style={{ color: "rgba(200,185,155,0.72)" }}
+                      style={{ color: "rgba(200,212,245,0.76)" }}
                     >
                       {renderPersonalizedText(narration, playerName, defaultPlayerName)}
                     </p>
@@ -323,15 +324,15 @@ function ChoiceButton({
       }`}
       style={{
         background: picked
-          ? "rgba(60, 36, 12, 0.85)"
+          ? "rgba(25, 48, 126, 0.88)"
           : dead
-            ? "rgba(20, 14, 8, 0.45)"
-            : "rgba(20, 14, 8, 0.68)",
+            ? "rgba(8, 18, 48, 0.5)"
+            : "rgba(3, 8, 22, 0.72)",
         border: picked
           ? "1.5px solid rgba(217, 122, 46, 0.85)"
           : dead
             ? "1.5px solid rgba(120, 100, 70, 0.25)"
-            : "1.5px solid rgba(180, 140, 80, 0.65)",
+            : "1.5px solid rgba(88, 120, 255, 0.62)",
         borderRadius: "6px",
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
@@ -339,7 +340,7 @@ function ChoiceButton({
           ? "0 2px 12px rgba(217,122,46,0.25), inset 0 1px 0 rgba(217,122,46,0.18)"
           : dead
             ? "none"
-            : "0 2px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(200,165,90,0.12)",
+            : "0 2px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(151,174,255,0.12)",
         opacity: dead ? 0.55 : 1,
       }}
     >
@@ -348,8 +349,8 @@ function ChoiceButton({
           dead ? "opacity-0" : "opacity-0 group-hover:opacity-100"
         }`}
         style={{
-          background: "rgba(180,140,60,0.10)",
-          border: "1.5px solid rgba(200,165,90,0.85)",
+          background: "rgba(49,91,255,0.12)",
+          border: "1.5px solid rgba(120,151,255,0.85)",
         }}
       />
       <span className="relative flex items-baseline gap-2">
@@ -360,7 +361,7 @@ function ChoiceButton({
               ? "rgba(220,150,80,0.95)"
               : dead
                 ? "rgba(160,140,100,0.55)"
-                : "rgba(195,155,75,0.9)",
+                : "rgba(151,174,255,0.92)",
           }}
         >
           {picked ? "✓" : "·"}
@@ -372,7 +373,7 @@ function ChoiceButton({
               ? "rgba(248,238,215,0.98)"
               : dead
                 ? "rgba(210,200,180,0.55)"
-                : "rgba(245,235,210,0.95)",
+                : "rgba(245,248,255,0.95)",
           }}
         >
           {label}
@@ -416,6 +417,12 @@ function Slide({
   const portrait = orientation === "portrait";
   const intrinsicW = portrait ? 1024 : 1792;
   const intrinsicH = portrait ? 1792 : 1024;
+  // A failed image must not collapse the stage to text width on black; the
+  // bounded stage below owns the aspect ratio and the fallback fills it.
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => {
+    setImageFailed(false);
+  }, [scene.imageUrl]);
 
   const beat = findBeat(scene, beatId) ?? findBeat(scene, scene.entryBeatId);
 
@@ -443,9 +450,12 @@ function Slide({
       : [];
   const pickedId = beat ? pickedChoiceIdAt(scene, beat.id) : null;
 
-  const sizeStyle: React.CSSProperties = portrait
-    ? { width: "100vw", height: "100dvh", objectFit: "cover" }
-    : { maxWidth: "100vw", maxHeight: "100dvh" };
+  const stage = resolveGalleryStageMetrics(orientation);
+  const sizeStyle: React.CSSProperties = {
+    width: "100%",
+    height: "100%",
+    objectFit: stage.imageFit,
+  };
 
   function choiceState(c: BeatChoice): ChoiceState {
     if (c.id === pickedId) return "picked";
@@ -473,23 +483,33 @@ function Slide({
   }
 
   return (
-    <div
-      className={`relative ${portrait ? "" : "inline-block"}`}
-    >
-      <img
-        key={scene.imageUrl}
-        src={scene.imageUrl}
-        width={intrinsicW}
-        height={intrinsicH}
-        alt="Scene"
-        crossOrigin="anonymous"
-        draggable={false}
-        onClick={handleImageClick}
-        className={`block ${portrait ? "" : "w-auto h-auto"} select-none animate-fade-in ${
-          beat?.next.type === "continue" ? "cursor-pointer" : "cursor-default"
-        }`}
-        style={sizeStyle}
-      />
+    <div className="relative flex w-full items-center justify-center">
+      <div className="relative overflow-hidden bg-black" style={stage.style}>
+      {imageFailed || !scene.imageUrl ? (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center">
+          <i className="fa-solid fa-image text-2xl text-white/35" aria-hidden />
+          <p className="max-w-sm font-serif text-[13px] leading-6 text-white/75">
+            {stage.missingImageNote}
+          </p>
+          <p className="text-[10px] smallcaps text-white/40">离线图集 · 画面缺失</p>
+        </div>
+      ) : (
+        <img
+          key={scene.imageUrl}
+          src={scene.imageUrl}
+          width={intrinsicW}
+          height={intrinsicH}
+          alt="Scene"
+          crossOrigin="anonymous"
+          draggable={false}
+          onError={() => setImageFailed(true)}
+          onClick={handleImageClick}
+          className={`block select-none animate-fade-in ${
+            beat?.next.type === "continue" ? "cursor-pointer" : "cursor-default"
+          }`}
+          style={sizeStyle}
+        />
+      )}
 
       {beat && (
         <div
@@ -529,13 +549,13 @@ function Slide({
                 handleImageClick();
               }}
               style={{
-                background: "rgba(14, 10, 6, 0.72)",
-                border: "1.5px solid rgba(175, 138, 72, 0.60)",
+                background: "rgba(3, 8, 22, 0.76)",
+                border: "1.5px solid rgba(88, 120, 255, 0.58)",
                 borderRadius: "6px",
                 backdropFilter: "blur(10px)",
                 WebkitBackdropFilter: "blur(10px)",
                 boxShadow:
-                  "0 4px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(200,165,90,0.10)",
+                  "0 4px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(151,174,255,0.10)",
               }}
             >
               {beat.speaker && (
@@ -543,7 +563,7 @@ function Slide({
                   className={`font-serif smallcaps mb-[0.6em] ${
                     portrait ? "text-[13px]" : "text-[11px] md:text-[12px]"
                   }`}
-                  style={{ color: "rgba(205,165,90,0.92)" }}
+                  style={{ color: "rgba(151,174,255,0.92)" }}
                 >
                   {renderPersonalizedSpeaker(beat.speaker, playerName, defaultPlayerName)}
                 </p>
@@ -552,7 +572,7 @@ function Slide({
                 className={`font-serif leading-[1.85] ${
                   portrait ? "text-[16px]" : "text-[13px] md:text-[15px]"
                 }`}
-                style={{ color: "rgba(245,235,210,0.95)" }}
+                style={{ color: "rgba(245,248,255,0.95)" }}
               >
                 {renderPersonalizedText(
                   beat.speaker ? beat.line : beat.narration,
@@ -562,7 +582,7 @@ function Slide({
                 {beat.speaker && beat.narration && (
                   <span
                     className={`block mt-[0.5em] italic ${portrait ? "text-[14px]" : "text-[12px] md:text-[13px]"}`}
-                    style={{ color: "rgba(200,185,155,0.78)" }}
+                    style={{ color: "rgba(200,212,245,0.8)" }}
                   >
                     {renderPersonalizedText(beat.narration, playerName, defaultPlayerName)}
                   </span>
@@ -572,7 +592,7 @@ function Slide({
               {beat.next.type === "continue" && (
                 <span
                   className="absolute bottom-[6px] right-[42px] text-[10px] animate-slow-pulse"
-                  style={{ color: "rgba(195,155,75,0.7)" }}
+                  style={{ color: "rgba(151,174,255,0.72)" }}
                   aria-hidden
                 >
                   ▼
@@ -585,7 +605,7 @@ function Slide({
                   e.stopPropagation();
                   setDialogueOpen(true);
                 }}
-                className="absolute bottom-[6px] right-[8px] flex h-7 w-7 items-center justify-center text-[rgba(195,155,75,0.78)] transition-colors hover:text-[rgba(245,235,210,0.96)]"
+                className="absolute bottom-[6px] right-[8px] flex h-7 w-7 items-center justify-center text-[rgba(151,174,255,0.78)] transition-colors hover:text-[rgba(245,248,255,0.96)]"
                 aria-label="查看本幕完整对话"
                 title="查看本幕对话"
               >
@@ -615,6 +635,7 @@ function Slide({
           className="hidden"
         />
       )}
+      </div>
     </div>
   );
 }
@@ -1260,7 +1281,7 @@ function GalleryInner() {
         >
           <span className="flex items-center gap-2 rounded-full bg-black/70 px-4 py-2 text-[11px] text-white/95 backdrop-blur-sm shadow-lg max-w-[92vw]">
             <i
-              className={`fa-solid ${downloadingScenes ? "fa-file-zipper" : "fa-circle-exclamation"} text-[11px] text-amber-300`}
+              className={`fa-solid ${downloadingScenes ? "fa-file-zipper" : "fa-circle-exclamation"} text-[11px] text-blue-300`}
             />
             {downloadingScenes
               ? "正在抓取图片并打包 zip,完成后会自动开始下载"

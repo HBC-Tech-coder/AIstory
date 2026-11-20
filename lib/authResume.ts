@@ -21,14 +21,16 @@ import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 // True when auth is disabled (self-host with blank Supabase env) or the visitor
 // already has a session. Gates any auth-required action (and the resume path).
 export async function isAuthed(): Promise<boolean> {
-  if (!AUTH_ENABLED) {
-    try {
-      const response = await fetch("/api/account/me", { cache: "no-store" });
-      const result = await response.json() as { authenticated?: boolean };
-      return result.authenticated === true;
-    } catch {
-      return false;
-    }
+  try {
+    const response = await fetch("/api/account/me", { cache: "no-store" });
+    const result = await response.json() as { authenticated?: boolean };
+    if (response.ok && result.authenticated === true) return true;
+    if (response.status === 401) return false;
+    // Preserve the existing auth-disabled self-host/BYOK UI behavior; this is
+    // never a server credential/billing authorization or an AIUser session.
+    if (!AUTH_ENABLED) return true;
+  } catch {
+    if (!AUTH_ENABLED) return true;
   }
   const sb = createSupabaseClient();
   const { data } = await sb.auth.getUser();

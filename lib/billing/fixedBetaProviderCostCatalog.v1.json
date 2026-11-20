@@ -1,0 +1,746 @@
+{
+  "schema": "aistory.fixed-beta-provider-cost-catalog/v1",
+  "catalogId": "fixed-beta-provider-cost-cn-beijing",
+  "catalogVersion": "v1-2026-08-28",
+  "status": "LOCAL_COST_AUDIT_CANDIDATE_ONLY",
+  "providerCurrency": "CNY",
+  "providerMinorUnitScale": 2,
+  "region": "cn-beijing",
+  "collectedOn": "2026-08-28",
+  "candidateEffectiveOn": "2026-08-28",
+  "review": {
+    "technicalCoverage": "PARTIAL",
+    "founderBusinessAmountApproval": "PENDING",
+    "budgetRiskApproval": "PENDING"
+  },
+  "riskPolicy": {
+    "aggregationPolicy": "SUM_ALL_POTENTIALLY_BILLABLE_ATTEMPTS",
+    "cachePolicy": "NO_CACHE_DISCOUNT_FOR_MISS_ENVELOPE",
+    "retryPolicy": "COUNT_EVERY_POTENTIALLY_BILLABLE_ATTEMPT",
+    "roundingPolicy": "CEIL_EACH_LINE_THEN_CEIL_BUFFER_TO_MINOR",
+    "formula": "ceil(sum(ceil(maxQuantityPerAttempt*maxBillableAttempts*unitPriceMinor/unitQuantity))*(10000+bufferBasisPoints)/10000)",
+    "bufferBasisPoints": 0
+  },
+  "userPricing": {
+    "pricingMode": "fixed_beta_credit_v1",
+    "fixedCreditsPerOperation": 1,
+    "providerCostPurpose": "AUDIT_AND_RISK_CONTROL_ONLY",
+    "saveSchema": "aistory.fixed-beta-pricing-candidate/v1"
+  },
+  "eligibleEnvelopeAuthorities": [
+    {
+      "path": "app/api/style-hot-swap/route.ts",
+      "sha256": "f05b034ccb7a3baa2cd7d7ac88fd38924e08ba9f0ccf3bbb100ed94f1b85c89f"
+    },
+    {
+      "path": "lib/ai-client/fetchWithRetry.ts",
+      "sha256": "23d0d5dd528d07c89ed9886dcbe70271cc2693364153191af1f1788d71d496bd"
+    },
+    {
+      "path": "lib/ai-client/image.ts",
+      "sha256": "f6f86b34b91ab76093c8fdc671814bb8b81dfcaf10fa799aea39483443464404"
+    },
+    {
+      "path": "lib/engine/agents/painter.ts",
+      "sha256": "90f2cc82da5963a9f2e8e7fd96f525a34c6c1d039107db520b87e49af7b7f3c9"
+    },
+    {
+      "path": "lib/engine/styleHotSwapCache.ts",
+      "sha256": "66648c4f9473dedfd39f114c8a945213b96a5a13ba64ef911dcc8c09cdc107a0"
+    }
+  ],
+  "sources": [
+    {
+      "sourceId": "qwen-image-2.0-pro-beijing-output-image",
+      "officialUrl": "https://help.aliyun.com/zh/model-studio/model-pricing",
+      "capturedOn": "2026-08-28",
+      "sourceEffectiveOn": null,
+      "sourceEffectiveOnStatus": "NOT_STATED_BY_SOURCE",
+      "publisher": "Alibaba Cloud Model Studio",
+      "provider": "alibaba_model_studio",
+      "protocol": "dashscope_multimodal_generation",
+      "model": "qwen-image-2.0-pro",
+      "modelVersion": "qwen-image-2.0-pro-2026-04-22",
+      "modelVersionStatus": "OFFICIAL_ALIAS_SNAPSHOT",
+      "region": "cn-beijing",
+      "currency": "CNY",
+      "priceFacts": [
+        {
+          "factId": "output_image_success",
+          "metric": "output_image",
+          "condition": "successful_output_image",
+          "unitQuantity": 1,
+          "unitPriceMinor": 50
+        }
+      ]
+    },
+    {
+      "sourceId": "qwen-plus-beijing-token-pricing",
+      "officialUrl": "https://help.aliyun.com/zh/model-studio/qwen-plus",
+      "capturedOn": "2026-08-28",
+      "sourceEffectiveOn": null,
+      "sourceEffectiveOnStatus": "NOT_STATED_BY_SOURCE",
+      "publisher": "Alibaba Cloud Model Studio",
+      "provider": "alibaba_model_studio",
+      "protocol": "openai_compatible",
+      "model": "qwen-plus",
+      "modelVersion": null,
+      "modelVersionStatus": "ALIAS_VERSION_CONFLICT_REQUIRES_REVIEW",
+      "region": "cn-beijing",
+      "currency": "CNY",
+      "priceFacts": [
+        {
+          "factId": "input_tokens_128k_to_256k",
+          "metric": "input_tokens",
+          "condition": "input_tokens_gt_128000_lte_256000",
+          "unitQuantity": 1000000,
+          "unitPriceMinor": 240
+        },
+        {
+          "factId": "input_tokens_256k_to_1m",
+          "metric": "input_tokens",
+          "condition": "input_tokens_gt_256000_lte_1000000",
+          "unitQuantity": 1000000,
+          "unitPriceMinor": 480
+        },
+        {
+          "factId": "input_tokens_lte_128k",
+          "metric": "input_tokens",
+          "condition": "input_tokens_lte_128000",
+          "unitQuantity": 1000000,
+          "unitPriceMinor": 80
+        },
+        {
+          "factId": "output_tokens_128k_to_256k",
+          "metric": "output_tokens",
+          "condition": "input_tokens_gt_128000_lte_256000_non_thinking",
+          "unitQuantity": 1000000,
+          "unitPriceMinor": 2000
+        },
+        {
+          "factId": "output_tokens_256k_to_1m",
+          "metric": "output_tokens",
+          "condition": "input_tokens_gt_256000_lte_1000000_non_thinking",
+          "unitQuantity": 1000000,
+          "unitPriceMinor": 4800
+        },
+        {
+          "factId": "output_tokens_lte_128k",
+          "metric": "output_tokens",
+          "condition": "input_tokens_lte_128000_non_thinking",
+          "unitQuantity": 1000000,
+          "unitPriceMinor": 200
+        },
+        {
+          "factId": "thinking_tokens_128k_to_256k",
+          "metric": "thinking_output_tokens",
+          "condition": "input_tokens_gt_128000_lte_256000_thinking",
+          "unitQuantity": 1000000,
+          "unitPriceMinor": 2400
+        },
+        {
+          "factId": "thinking_tokens_256k_to_1m",
+          "metric": "thinking_output_tokens",
+          "condition": "input_tokens_gt_256000_lte_1000000_thinking",
+          "unitQuantity": 1000000,
+          "unitPriceMinor": 6400
+        },
+        {
+          "factId": "thinking_tokens_lte_128k",
+          "metric": "thinking_output_tokens",
+          "condition": "input_tokens_lte_128000_thinking",
+          "unitQuantity": 1000000,
+          "unitPriceMinor": 800
+        }
+      ]
+    },
+    {
+      "sourceId": "qwen-vl-plus-beijing-token-pricing",
+      "officialUrl": "https://help.aliyun.com/zh/model-studio/qwen-vl-plus",
+      "capturedOn": "2026-08-28",
+      "sourceEffectiveOn": null,
+      "sourceEffectiveOnStatus": "NOT_STATED_BY_SOURCE",
+      "publisher": "Alibaba Cloud Model Studio",
+      "provider": "alibaba_model_studio",
+      "protocol": "openai_compatible",
+      "model": "qwen-vl-plus",
+      "modelVersion": "qwen-vl-plus-2025-08-15",
+      "modelVersionStatus": "OFFICIAL_ALIAS_SNAPSHOT",
+      "region": "cn-beijing",
+      "currency": "CNY",
+      "priceFacts": [
+        {
+          "factId": "input_tokens",
+          "metric": "input_tokens",
+          "condition": "realtime_standard",
+          "unitQuantity": 1000000,
+          "unitPriceMinor": 80
+        },
+        {
+          "factId": "output_tokens",
+          "metric": "output_tokens",
+          "condition": "realtime_standard",
+          "unitQuantity": 1000000,
+          "unitPriceMinor": 200
+        }
+      ]
+    },
+    {
+      "sourceId": "qwen3-tts-flash-beijing-character-pricing",
+      "officialUrl": "https://help.aliyun.com/zh/model-studio/qwen3-tts-flash",
+      "capturedOn": "2026-08-28",
+      "sourceEffectiveOn": null,
+      "sourceEffectiveOnStatus": "NOT_STATED_BY_SOURCE",
+      "publisher": "Alibaba Cloud Model Studio",
+      "provider": "alibaba_model_studio",
+      "protocol": "dashscope_multimodal_generation",
+      "model": "qwen3-tts-flash",
+      "modelVersion": "qwen3-tts-flash-2025-11-27",
+      "modelVersionStatus": "OFFICIAL_ALIAS_SNAPSHOT",
+      "region": "cn-beijing",
+      "currency": "CNY",
+      "priceFacts": [
+        {
+          "factId": "input_weighted_characters",
+          "metric": "weighted_character",
+          "condition": "input_weighted_characters",
+          "unitQuantity": 10000,
+          "unitPriceMinor": 80
+        }
+      ]
+    }
+  ],
+  "operations": [
+    {
+      "operation": "story.start",
+      "modality": "mixed",
+      "runtimeBinding": {
+        "provider": "aistory_runtime_binding_v1",
+        "model": "sha256:d72af0bdaef2adccbfc9dee94fcdbefd1a41a6f2dde1c49ccd780572fdabad3b"
+      },
+      "sourceIds": [
+        "qwen-image-2.0-pro-beijing-output-image",
+        "qwen-plus-beijing-token-pricing",
+        "qwen3-tts-flash-beijing-character-pricing"
+      ],
+      "eligibility": "not_eligible",
+      "reasonCodes": [
+        "unbounded_provider_call_count",
+        "unbounded_text_input_output_tokens"
+      ],
+      "requestLimits": {
+        "inputTokensMax": null,
+        "outputTokensMax": null,
+        "inputImagesMax": null,
+        "outputImagesPerAttemptMax": 1,
+        "ttsCharactersMax": null,
+        "providerInvocationsMax": null,
+        "billableAttemptsMax": null,
+        "returnedArtifactsMax": null
+      },
+      "limitEvidence": [
+        {
+          "metric": "new_cast_count",
+          "maximum": null,
+          "reference": "lib/engine/agents/writer.ts:417"
+        },
+        {
+          "metric": "output_images_per_attempt",
+          "maximum": 1,
+          "reference": "lib/ai-client/image.ts:365"
+        },
+        {
+          "metric": "text_output_tokens",
+          "maximum": null,
+          "reference": "lib/ai-client/chat.ts:121"
+        }
+      ],
+      "pricingLines": [],
+      "cachePolicy": "cache_hit_zero_cost_miss_unbounded",
+      "retryPolicy": "provider_call_count_unbounded",
+      "aggregationPolicy": "not_calculable_missing_request_cap",
+      "roundingPolicy": "ceil_each_line_then_ceil_buffer_to_minor",
+      "formulaId": null,
+      "bufferBasisPoints": 0,
+      "providerCostMinor": null,
+      "technicalReviewStatus": "BLOCKED_MISSING_REQUEST_CAP"
+    },
+    {
+      "operation": "story.scene",
+      "modality": "mixed",
+      "runtimeBinding": {
+        "provider": "aistory_runtime_binding_v1",
+        "model": "sha256:986dc2f5c71f447b53b6b749258426777366bee4838600773a21e5482d36dda1"
+      },
+      "sourceIds": [
+        "qwen-image-2.0-pro-beijing-output-image",
+        "qwen-plus-beijing-token-pricing",
+        "qwen3-tts-flash-beijing-character-pricing"
+      ],
+      "eligibility": "not_eligible",
+      "reasonCodes": [
+        "unbounded_provider_call_count",
+        "unbounded_text_input_output_tokens"
+      ],
+      "requestLimits": {
+        "inputTokensMax": null,
+        "outputTokensMax": null,
+        "inputImagesMax": null,
+        "outputImagesPerAttemptMax": 1,
+        "ttsCharactersMax": null,
+        "providerInvocationsMax": null,
+        "billableAttemptsMax": null,
+        "returnedArtifactsMax": null
+      },
+      "limitEvidence": [
+        {
+          "metric": "new_cast_count",
+          "maximum": null,
+          "reference": "lib/engine/agents/writer.ts:417"
+        },
+        {
+          "metric": "output_images_per_attempt",
+          "maximum": 1,
+          "reference": "lib/ai-client/image.ts:365"
+        },
+        {
+          "metric": "text_output_tokens",
+          "maximum": null,
+          "reference": "lib/ai-client/chat.ts:121"
+        }
+      ],
+      "pricingLines": [],
+      "cachePolicy": "cache_hit_zero_cost_miss_unbounded",
+      "retryPolicy": "provider_call_count_unbounded",
+      "aggregationPolicy": "not_calculable_missing_request_cap",
+      "roundingPolicy": "ceil_each_line_then_ceil_buffer_to_minor",
+      "formulaId": null,
+      "bufferBasisPoints": 0,
+      "providerCostMinor": null,
+      "technicalReviewStatus": "BLOCKED_MISSING_REQUEST_CAP"
+    },
+    {
+      "operation": "story.scene.prefetch",
+      "modality": "mixed",
+      "runtimeBinding": {
+        "provider": "aistory_runtime_binding_v1",
+        "model": "sha256:c394ccdb00be31851c3fb17d007db9b76670ea617cd88362ca7795773eb374a4"
+      },
+      "sourceIds": [
+        "qwen-image-2.0-pro-beijing-output-image",
+        "qwen-plus-beijing-token-pricing",
+        "qwen3-tts-flash-beijing-character-pricing"
+      ],
+      "eligibility": "not_eligible",
+      "reasonCodes": [
+        "unbounded_provider_call_count",
+        "unbounded_text_input_output_tokens"
+      ],
+      "requestLimits": {
+        "inputTokensMax": null,
+        "outputTokensMax": null,
+        "inputImagesMax": null,
+        "outputImagesPerAttemptMax": 1,
+        "ttsCharactersMax": null,
+        "providerInvocationsMax": null,
+        "billableAttemptsMax": null,
+        "returnedArtifactsMax": null
+      },
+      "limitEvidence": [
+        {
+          "metric": "new_cast_count",
+          "maximum": null,
+          "reference": "lib/engine/agents/writer.ts:417"
+        },
+        {
+          "metric": "output_images_per_attempt",
+          "maximum": 1,
+          "reference": "lib/ai-client/image.ts:365"
+        },
+        {
+          "metric": "text_output_tokens",
+          "maximum": null,
+          "reference": "lib/ai-client/chat.ts:121"
+        }
+      ],
+      "pricingLines": [],
+      "cachePolicy": "cache_hit_zero_cost_miss_unbounded",
+      "retryPolicy": "provider_call_count_unbounded",
+      "aggregationPolicy": "not_calculable_missing_request_cap",
+      "roundingPolicy": "ceil_each_line_then_ceil_buffer_to_minor",
+      "formulaId": null,
+      "bufferBasisPoints": 0,
+      "providerCostMinor": null,
+      "technicalReviewStatus": "BLOCKED_MISSING_REQUEST_CAP"
+    },
+    {
+      "operation": "vision.decide",
+      "modality": "vision",
+      "runtimeBinding": {
+        "provider": "aistory_runtime_binding_v1",
+        "model": "sha256:216cc94d79525a9ae4f78ea9c24f0e6d91995b028ab83b5bae6de08f2fdb09f6"
+      },
+      "sourceIds": ["qwen-vl-plus-beijing-token-pricing"],
+      "eligibility": "not_eligible",
+      "reasonCodes": ["unbounded_vision_input_output_units"],
+      "requestLimits": {
+        "inputTokensMax": null,
+        "outputTokensMax": null,
+        "inputImagesMax": 1,
+        "outputImagesPerAttemptMax": null,
+        "ttsCharactersMax": null,
+        "providerInvocationsMax": 1,
+        "billableAttemptsMax": 1,
+        "returnedArtifactsMax": 1
+      },
+      "limitEvidence": [
+        {
+          "metric": "annotated_image_base64_characters",
+          "maximum": 3145728,
+          "reference": "app/api/vision/route.ts:54"
+        },
+        {
+          "metric": "input_tokens",
+          "maximum": null,
+          "reference": "lib/ai-client/vision.ts:34"
+        },
+        {
+          "metric": "output_tokens",
+          "maximum": null,
+          "reference": "lib/ai-client/vision.ts:34"
+        }
+      ],
+      "pricingLines": [],
+      "cachePolicy": "no_cache_provider_miss_unbounded",
+      "retryPolicy": "sdk_retry_zero_but_quantity_unbounded",
+      "aggregationPolicy": "not_calculable_missing_request_cap",
+      "roundingPolicy": "ceil_each_line_then_ceil_buffer_to_minor",
+      "formulaId": null,
+      "bufferBasisPoints": 0,
+      "providerCostMinor": null,
+      "technicalReviewStatus": "BLOCKED_MISSING_REQUEST_CAP"
+    },
+    {
+      "operation": "story.classify-freeform",
+      "modality": "text",
+      "runtimeBinding": {
+        "provider": "aistory_runtime_binding_v1",
+        "model": "sha256:0f55061a0a8b5e44c6625bbf9eabc6d50b355f0163d0ffe2c0be7776488e075b"
+      },
+      "sourceIds": ["qwen-plus-beijing-token-pricing"],
+      "eligibility": "not_eligible",
+      "reasonCodes": ["unbounded_text_input_output_tokens"],
+      "requestLimits": {
+        "inputTokensMax": null,
+        "outputTokensMax": null,
+        "inputImagesMax": 0,
+        "outputImagesPerAttemptMax": null,
+        "ttsCharactersMax": null,
+        "providerInvocationsMax": 1,
+        "billableAttemptsMax": 1,
+        "returnedArtifactsMax": 1
+      },
+      "limitEvidence": [
+        {
+          "metric": "freeform_text_characters",
+          "maximum": null,
+          "reference": "app/api/classify-freeform/route.ts:30"
+        },
+        {
+          "metric": "output_tokens",
+          "maximum": null,
+          "reference": "lib/ai-client/chat.ts:121"
+        }
+      ],
+      "pricingLines": [],
+      "cachePolicy": "no_cache_provider_miss_unbounded",
+      "retryPolicy": "sdk_retry_zero_but_quantity_unbounded",
+      "aggregationPolicy": "not_calculable_missing_request_cap",
+      "roundingPolicy": "ceil_each_line_then_ceil_buffer_to_minor",
+      "formulaId": null,
+      "bufferBasisPoints": 0,
+      "providerCostMinor": null,
+      "technicalReviewStatus": "BLOCKED_MISSING_REQUEST_CAP"
+    },
+    {
+      "operation": "story.insert-beat",
+      "modality": "text",
+      "runtimeBinding": {
+        "provider": "aistory_runtime_binding_v1",
+        "model": "sha256:6f2d845663d0b199d6c6e3f69e744927333aad2c167e6312e62ec9d525c5095f"
+      },
+      "sourceIds": ["qwen-plus-beijing-token-pricing"],
+      "eligibility": "not_eligible",
+      "reasonCodes": ["unbounded_text_input_output_tokens"],
+      "requestLimits": {
+        "inputTokensMax": null,
+        "outputTokensMax": null,
+        "inputImagesMax": 0,
+        "outputImagesPerAttemptMax": null,
+        "ttsCharactersMax": null,
+        "providerInvocationsMax": 1,
+        "billableAttemptsMax": 1,
+        "returnedArtifactsMax": 3
+      },
+      "limitEvidence": [
+        {
+          "metric": "freeform_action_characters",
+          "maximum": null,
+          "reference": "app/api/insert-beat/route.ts:30"
+        },
+        {
+          "metric": "output_tokens",
+          "maximum": null,
+          "reference": "lib/ai-client/chat.ts:121"
+        }
+      ],
+      "pricingLines": [],
+      "cachePolicy": "no_cache_provider_miss_unbounded",
+      "retryPolicy": "sdk_retry_zero_but_quantity_unbounded",
+      "aggregationPolicy": "not_calculable_missing_request_cap",
+      "roundingPolicy": "ceil_each_line_then_ceil_buffer_to_minor",
+      "formulaId": null,
+      "bufferBasisPoints": 0,
+      "providerCostMinor": null,
+      "technicalReviewStatus": "BLOCKED_MISSING_REQUEST_CAP"
+    },
+    {
+      "operation": "style.redraw",
+      "modality": "image",
+      "runtimeBinding": {
+        "provider": "aistory_runtime_binding_v1",
+        "model": "sha256:5414dfed2e938cf6476c65f85fe502906db2c7a498227f8dfe3cbfeb811116ce"
+      },
+      "sourceIds": ["qwen-image-2.0-pro-beijing-output-image"],
+      "eligibility": "eligible",
+      "reasonCodes": [],
+      "requestLimits": {
+        "inputTokensMax": null,
+        "outputTokensMax": null,
+        "inputImagesMax": 4,
+        "outputImagesPerAttemptMax": 1,
+        "ttsCharactersMax": null,
+        "providerInvocationsMax": 6,
+        "billableAttemptsMax": 6,
+        "returnedArtifactsMax": 1
+      },
+      "limitEvidence": [
+        {
+          "metric": "billable_attempts",
+          "maximum": 6,
+          "reference": "lib/engine/agents/painter.ts:284"
+        },
+        {
+          "metric": "input_images",
+          "maximum": 4,
+          "reference": "lib/engine/agents/painter.ts:38"
+        },
+        {
+          "metric": "output_images_per_attempt",
+          "maximum": 1,
+          "reference": "lib/ai-client/image.ts:365"
+        },
+        {
+          "metric": "returned_artifacts",
+          "maximum": 1,
+          "reference": "app/api/style-hot-swap/route.ts:151"
+        }
+      ],
+      "pricingLines": [
+        {
+          "sourceId": "qwen-image-2.0-pro-beijing-output-image",
+          "factId": "output_image_success",
+          "maxQuantityPerAttempt": 1,
+          "maxBillableAttempts": 6
+        }
+      ],
+      "cachePolicy": "cache_hit_zero_cost_miss_uses_full_envelope",
+      "retryPolicy": "global_worst_case_billable_attempt_bound",
+      "aggregationPolicy": "sum_all_potentially_billable_attempts",
+      "roundingPolicy": "ceil_each_line_then_ceil_buffer_to_minor",
+      "formulaId": "minor_cost_v1",
+      "bufferBasisPoints": 0,
+      "providerCostMinor": 300,
+      "technicalReviewStatus": "MECHANICALLY_VERIFIED"
+    },
+    {
+      "operation": "style.rewrite",
+      "modality": "text",
+      "runtimeBinding": {
+        "provider": "aistory_runtime_binding_v1",
+        "model": "sha256:cda91ed6808c2b19c071efe93cfa9ddb0e2a769b721bcbd75334bb5a5eb3233a"
+      },
+      "sourceIds": ["qwen-plus-beijing-token-pricing"],
+      "eligibility": "not_eligible",
+      "reasonCodes": ["unbounded_text_input_output_tokens"],
+      "requestLimits": {
+        "inputTokensMax": null,
+        "outputTokensMax": null,
+        "inputImagesMax": 0,
+        "outputImagesPerAttemptMax": null,
+        "ttsCharactersMax": null,
+        "providerInvocationsMax": 1,
+        "billableAttemptsMax": 1,
+        "returnedArtifactsMax": null
+      },
+      "limitEvidence": [
+        {
+          "metric": "canonical_beats",
+          "maximum": null,
+          "reference": "app/api/style-hot-swap/route.ts:189"
+        },
+        {
+          "metric": "output_tokens",
+          "maximum": null,
+          "reference": "lib/ai-client/chat.ts:121"
+        }
+      ],
+      "pricingLines": [],
+      "cachePolicy": "cache_hit_zero_cost_miss_unbounded",
+      "retryPolicy": "sdk_retry_zero_but_quantity_unbounded",
+      "aggregationPolicy": "not_calculable_missing_request_cap",
+      "roundingPolicy": "ceil_each_line_then_ceil_buffer_to_minor",
+      "formulaId": null,
+      "bufferBasisPoints": 0,
+      "providerCostMinor": null,
+      "technicalReviewStatus": "BLOCKED_MISSING_REQUEST_CAP"
+    },
+    {
+      "operation": "vision.style-parse",
+      "modality": "vision",
+      "runtimeBinding": {
+        "provider": "aistory_runtime_binding_v1",
+        "model": "sha256:de5b0a70fce11d07757ed3b937ca761f19122525b4de907e3c7c0db8abc6f521"
+      },
+      "sourceIds": ["qwen-vl-plus-beijing-token-pricing"],
+      "eligibility": "not_eligible",
+      "reasonCodes": ["unbounded_vision_input_output_units"],
+      "requestLimits": {
+        "inputTokensMax": null,
+        "outputTokensMax": null,
+        "inputImagesMax": 1,
+        "outputImagesPerAttemptMax": null,
+        "ttsCharactersMax": null,
+        "providerInvocationsMax": 1,
+        "billableAttemptsMax": 1,
+        "returnedArtifactsMax": 1
+      },
+      "limitEvidence": [
+        {
+          "metric": "image_data_url_characters",
+          "maximum": 3145728,
+          "reference": "app/api/parse-style-image/route.ts:80"
+        },
+        {
+          "metric": "input_tokens",
+          "maximum": null,
+          "reference": "lib/ai-client/vision.ts:34"
+        },
+        {
+          "metric": "output_tokens",
+          "maximum": null,
+          "reference": "lib/ai-client/vision.ts:34"
+        }
+      ],
+      "pricingLines": [],
+      "cachePolicy": "no_cache_provider_miss_unbounded",
+      "retryPolicy": "sdk_retry_zero_but_quantity_unbounded",
+      "aggregationPolicy": "not_calculable_missing_request_cap",
+      "roundingPolicy": "ceil_each_line_then_ceil_buffer_to_minor",
+      "formulaId": null,
+      "bufferBasisPoints": 0,
+      "providerCostMinor": null,
+      "technicalReviewStatus": "BLOCKED_MISSING_REQUEST_CAP"
+    },
+    {
+      "operation": "text.character-names",
+      "modality": "text",
+      "runtimeBinding": {
+        "provider": "aistory_runtime_binding_v1",
+        "model": "sha256:4a3f8273d34cdfd68f78dac9963de4c63e6aec885054e934d9ba4f672e499fb4"
+      },
+      "sourceIds": ["qwen-plus-beijing-token-pricing"],
+      "eligibility": "not_eligible",
+      "reasonCodes": ["unbounded_text_input_output_tokens"],
+      "requestLimits": {
+        "inputTokensMax": null,
+        "outputTokensMax": null,
+        "inputImagesMax": 0,
+        "outputImagesPerAttemptMax": null,
+        "ttsCharactersMax": null,
+        "providerInvocationsMax": 1,
+        "billableAttemptsMax": 1,
+        "returnedArtifactsMax": 12
+      },
+      "limitEvidence": [
+        {
+          "metric": "name_count",
+          "maximum": 12,
+          "reference": "app/api/character-names/route.ts:59"
+        },
+        {
+          "metric": "prompt_context_characters",
+          "maximum": null,
+          "reference": "app/api/character-names/route.ts:84"
+        },
+        {
+          "metric": "output_tokens",
+          "maximum": null,
+          "reference": "lib/ai-client/chat.ts:121"
+        }
+      ],
+      "pricingLines": [],
+      "cachePolicy": "no_cache_provider_miss_unbounded",
+      "retryPolicy": "sdk_retry_zero_but_quantity_unbounded",
+      "aggregationPolicy": "not_calculable_missing_request_cap",
+      "roundingPolicy": "ceil_each_line_then_ceil_buffer_to_minor",
+      "formulaId": null,
+      "bufferBasisPoints": 0,
+      "providerCostMinor": null,
+      "technicalReviewStatus": "BLOCKED_MISSING_REQUEST_CAP"
+    },
+    {
+      "operation": "tts.beat",
+      "modality": "tts",
+      "runtimeBinding": {
+        "provider": "aistory_runtime_binding_v1",
+        "model": "sha256:057893112542c892fc67ac2ac4aa7807179412468f531be897683a94d462930a"
+      },
+      "sourceIds": ["qwen3-tts-flash-beijing-character-pricing"],
+      "eligibility": "not_eligible",
+      "reasonCodes": ["unbounded_tts_billing_characters"],
+      "requestLimits": {
+        "inputTokensMax": null,
+        "outputTokensMax": null,
+        "inputImagesMax": 0,
+        "outputImagesPerAttemptMax": null,
+        "ttsCharactersMax": null,
+        "providerInvocationsMax": 2,
+        "billableAttemptsMax": 1,
+        "returnedArtifactsMax": 1
+      },
+      "limitEvidence": [
+        {
+          "metric": "billable_generation_posts",
+          "maximum": 1,
+          "reference": "lib/tts-client/bailian.ts:97"
+        },
+        {
+          "metric": "tts_characters",
+          "maximum": null,
+          "reference": "app/api/beat-audio/route.ts:44"
+        }
+      ],
+      "pricingLines": [],
+      "cachePolicy": "cache_hit_zero_cost_miss_unbounded",
+      "retryPolicy": "single_post_but_quantity_unbounded",
+      "aggregationPolicy": "not_calculable_missing_request_cap",
+      "roundingPolicy": "ceil_each_line_then_ceil_buffer_to_minor",
+      "formulaId": null,
+      "bufferBasisPoints": 0,
+      "providerCostMinor": null,
+      "technicalReviewStatus": "BLOCKED_MISSING_REQUEST_CAP"
+    }
+  ],
+  "fingerprint": "sha256:350aafb82c76ba1c2a3ad81739fc85c67ce7c2398cc91151a86bc3d52938357e"
+}

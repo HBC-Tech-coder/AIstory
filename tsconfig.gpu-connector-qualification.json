@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "noEmit": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "lib/gpu-coordinator/types.ts",
+    "lib/gpu-coordinator/connectorCompatibility.ts",
+    "lib/gpu-coordinator/protocol.ts",
+    "lib/gpu-coordinator/connectorPackageQualification.ts",
+    "scripts/export-gpu-coordinator-golden-contract.ts",
+    "scripts/qualify-gpu-connector-package.ts",
+    "scripts/test-gpu-connector-package-qualification.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".next",
+    ".tmp",
+    "app/app",
+    "components/components",
+    "lib/lib"
+  ]
+}

@@ -41,6 +41,10 @@ function orientationFromJob(job: StoredGenerationJob): ProjectAssetOrientation {
     }
     return "unknown";
   }
+  if (job.provider === "gpu-connector-lan") {
+    if (job.input.width === job.input.height) return "square";
+    return job.input.width > job.input.height ? "landscape" : "portrait";
+  }
   if (job.input.aspectRatio === "16:9" || job.input.size === "1344x768") {
     return "landscape";
   }
@@ -58,7 +62,9 @@ function orientationFromJob(job: StoredGenerationJob): ProjectAssetOrientation {
 }
 
 function seedFromJob(job: StoredGenerationJob): number | undefined {
-  return Number.isSafeInteger(job.input.seed) ? job.input.seed : undefined;
+  return "seed" in job.input && Number.isSafeInteger(job.input.seed)
+    ? job.input.seed
+    : undefined;
 }
 
 function workflowFromJob(
@@ -128,6 +134,9 @@ export async function adoptGenerationJobArtifact(
     provider: job.provider,
     modality: job.modality,
     status: "ready",
+    ...(job.releaseClassification
+      ? { releaseClassification: job.releaseClassification }
+      : {}),
     name: safeName(job, contentHash),
     url: job.artifact.url,
     contentHash,

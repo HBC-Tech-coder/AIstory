@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { buildFallbackCards, type FeaturedCard } from "@/lib/featuredStories";
 import { useLocalePath } from "@/lib/i18n/hooks";
 import { useI18n } from "@/lib/i18n/client";
-import { useCreditBalance } from "@/components/CreditBalance";
+import { useCreditBalanceDetails } from "@/components/CreditBalance";
 import {
   readStoredBranchPrefetchDepth,
   SettingsModal,
@@ -16,6 +16,15 @@ import {
 import { UsageDisclosureNote } from "@/components/UsageDisclosureNote";
 import { UserChip } from "@/components/UserChip";
 import { formatCredits } from "@/lib/credits";
+import {
+  previewFeatureState,
+  previewMetricLabel,
+  resolveRoleCard,
+  rewriteDraftNotice,
+  withMobileReturnTo,
+  type StoryCharacter,
+} from "@/lib/mobilePreviewPolicy";
+import { WORLD_MODEL_DEMOS } from "@/lib/world-model-demos/catalog";
 import type { BranchPrefetchDepth } from "@infiplot/types";
 
 const MOBILE_ASSET_ROOT = "/aistory/mobile-v1";
@@ -43,6 +52,8 @@ type MobileHistoryStory = {
   href: string;
   progress: string;
   heat: string;
+  choiceLabels?: readonly [string, string];
+  character?: StoryCharacter;
 };
 
 const prototypeStories: MobileHistoryStory[] = [
@@ -50,51 +61,51 @@ const prototypeStories: MobileHistoryStory[] = [
     id: "rain-reunion",
     outline: "雨声贴着玻璃往下滑，沈知遥的手机屏幕亮起。那条十年前不该出现的短信只有一行：不要打开今晚的合影。",
     title: "雨夜同学会",
-    subtitle: "看到第5章 · 群像 · 作者推荐",
+    subtitle: "示例剧集 · 群像 · 作者推荐",
     cover: `${MOBILE_ASSET_ROOT}/history-rain-reunion.png`,
     href: "/play?card=f6",
-    progress: "第5章",
-    heat: "98.1万",
+    progress: "预览",
+    heat: "示例",
   },
   {
     id: "future-letter",
     outline: "你收到一封写着十年后日期的信，信里准确预告了今天将要发生的第一件小事。",
     title: "十年后的来信",
-    subtitle: "看到第1章 · 热搜 · AI替身线",
+    subtitle: "示例剧集 · 热搜 · AI替身线",
     cover: `${MOBILE_ASSET_ROOT}/history-future-letter.png`,
     href: "/play?card=f8",
-    progress: "第1章",
-    heat: "86.4万",
+    progress: "预览",
+    heat: "示例",
   },
   {
     id: "midnight-archive",
     outline: "档案室的旧灯忽明忽暗，所有被删掉的采访记录都指向同一个没有登记过的名字。",
     title: "午夜档案室",
-    subtitle: "看到第3章 · 推理 · 双视角",
+    subtitle: "示例剧集 · 推理 · 双视角",
     cover: `${MOBILE_ASSET_ROOT}/history-midnight-archive.png`,
     href: "/play?card=m18",
-    progress: "第3章",
-    heat: "73.9万",
+    progress: "预览",
+    heat: "示例",
   },
   {
     id: "mirror-visitor",
     outline: "镜子里的人比你慢半拍抬头，却先一步说出了你正准备隐瞒的秘密。",
     title: "镜中来客",
-    subtitle: "看到第7章 · 惊悚 · 多结局",
+    subtitle: "示例剧集 · 惊悚 · 多结局",
     cover: `${MOBILE_ASSET_ROOT}/history-mirror-visitor.png`,
     href: "/play?card=f12",
-    progress: "第7章",
-    heat: "66.8万",
+    progress: "预览",
+    heat: "示例",
   },
   {
     id: "missing-graduation",
     outline: "毕业照里多出一个你不认识的人，而所有同学都坚称她曾经和你同桌三年。",
     title: "消失的毕业照",
-    subtitle: "看到第2章 · 悬疑 · 36条世界线",
+    subtitle: "示例剧集 · 悬疑 · 多世界线演示",
     cover: `${MOBILE_ASSET_ROOT}/history-missing-graduation.png`,
     href: "/play?custom=1",
-    progress: "第2章",
-    heat: "2.4万",
+    progress: "预览",
+    heat: "示例",
   },
 ];
 
@@ -112,19 +123,18 @@ const friendItems = [
   { name: "沈知遥", text: "当前角色卡被引用 18 次。" },
 ];
 
-function cardToHistory(card: FeaturedCard, index: number): MobileHistoryStory {
-  const chapter = (index % 6) + 1;
+function cardToHistory(card: FeaturedCard): MobileHistoryStory {
   return {
     id: card.id,
     title: card.title,
     outline: card.outline,
     subtitle: card.assetStatus === "pending"
       ? `画面待生成 · ${card.outline.slice(0, 18)}...`
-      : `看到第${chapter}章 · ${card.outline.slice(0, 18)}...`,
+      : `预览剧集 · ${card.outline.slice(0, 18)}...`,
     cover: card.coverPath,
     href: card.playPath || `/play?card=${encodeURIComponent(card.id)}`,
-    progress: `第${chapter}章`,
-    heat: `${(62 + index * 4.7).toFixed(1)}万`,
+    progress: "预览",
+    heat: card.assetStatus === "pending" ? "画面待生成" : "预览",
   };
 }
 
@@ -137,21 +147,9 @@ function StatPill({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ProgressBars() {
-  return (
-    <div className="mobile-df-progress" aria-hidden>
-      <i className="done" />
-      <i className="done" />
-      <i className="now" />
-      <i />
-      <i />
-    </div>
-  );
-}
-
 export function MobileDreamFrameApp() {
   const { locale, t } = useI18n();
-  const creditBalance = useCreditBalance();
+  const { balance: creditBalance, source: creditSource } = useCreditBalanceDetails();
   const lp = useLocalePath();
   const [tab, setTab] = useState<MobileTab>("feed");
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -190,17 +188,39 @@ export function MobileDreamFrameApp() {
     return [...female, ...male].map(cardToHistory);
   }, []);
 
-  const stories = useMemo(
-    () => [...templateStories, ...prototypeStories],
+  const stories = useMemo<MobileHistoryStory[]>(
+    () => [
+      ...WORLD_MODEL_DEMOS.map((demo) => ({
+        id: demo.id,
+        title: demo.title,
+        subtitle: "世界模型 · 第一视角互动演示",
+        outline: demo.summary,
+        cover: demo.posterUrl,
+        href: demo.playPath,
+        progress: "视频演示",
+        heat: "新体验",
+        choiceLabels: [demo.choices[0].label, demo.choices[1].label] as const,
+      })),
+      ...templateStories,
+      ...prototypeStories,
+    ],
     [templateStories],
   );
   const storyCount = stories.length;
 
   const activeStory = stories[activeStoryIndex % storyCount] ?? prototypeStories[0]!;
+  const activeChoiceLabels = activeStory.choiceLabels ?? ["打开短信", "删除短信"];
   const feedImage =
     activeStory.id === "missing-graduation"
       ? `${MOBILE_ASSET_ROOT}/story-banquet.png`
       : activeStory.cover;
+
+  const roleCard = resolveRoleCard(activeStory.character);
+  const followState = previewFeatureState("follow");
+  const nearbyState = previewFeatureState("nearby");
+  const likeState = previewFeatureState("like");
+  const commentState = previewFeatureState("comment");
+  const playHref = withMobileReturnTo(lp(activeStory.href));
 
   function go(nextTab: MobileTab) {
     setTab(nextTab);
@@ -215,10 +235,6 @@ export function MobileDreamFrameApp() {
     } catch {
       /* ignore */
     }
-  }
-
-  function chooseBranch(label: string) {
-    setTip(`${label} 已进入你的个人世界线`);
   }
 
   function showStory(delta: 1 | -1) {
@@ -305,9 +321,9 @@ export function MobileDreamFrameApp() {
             </header>
 
             <div className="mobile-df-watch-tabs">
-              <button className="active" type="button">推荐</button>
-              <button type="button" onClick={() => setTip("关注流会展示好友公开分支")}>关注</button>
-              <button type="button" onClick={() => setTip("同城入口保留给线下活动和剧本杀联动")}>附近</button>
+              <button className="active" type="button" title="当前预览版仅提供推荐流">推荐</button>
+              <button type="button" title={followState.notice} onClick={() => setTip(followState.notice)}>关注</button>
+              <button type="button" title={nearbyState.notice} onClick={() => setTip(nearbyState.notice)}>附近</button>
             </div>
 
             <button
@@ -326,33 +342,34 @@ export function MobileDreamFrameApp() {
                 <i className="fa-solid fa-code-branch" />
                 <span>世界线</span>
               </button>
-              <button type="button" onClick={() => setTip("已收藏：这条分支热度 +1")}>
+              <button type="button" title={likeState.notice} onClick={() => setTip(likeState.notice)}>
                 <i className="fa-regular fa-heart" />
-                <span>2.4万</span>
+                <span>{previewMetricLabel("like")}</span>
               </button>
-              <button type="button" onClick={() => setTip("评论会带上当前分支引用")}>
+              <button type="button" title={commentState.notice} onClick={() => setTip(commentState.notice)}>
                 <i className="fa-regular fa-comment" />
-                <span>618</span>
+                <span>{previewMetricLabel("comment")}</span>
               </button>
               <button type="button" onClick={() => setSheet("role")}>
-                <b>夏</b>
+                <i className="fa-solid fa-id-card" />
                 <span>角色卡</span>
               </button>
             </aside>
 
             <div className="mobile-df-feed-copy">
               <div className="mobile-df-chapter-row">
-                <span>{activeStory.progress}</span>
-                <ProgressBars />
+                <span>{activeStory.progress} · 封面预览 · 进入完整播放器播放</span>
               </div>
               <h1>{activeStory.title}</h1>
               <p>{activeStory.outline}</p>
               <div className="mobile-df-choice-stack">
-                <button type="button" onClick={() => chooseBranch("主线继续：打开短信")}>
-                  打开短信 <i style={{ width: "62%" }} /><small>62% 选择</small>
+                <button type="button" onClick={() => { window.location.href = playHref; }}>
+                  {activeChoiceLabels[0]}
+                  <small>进入完整播放器选择</small>
                 </button>
-                <button type="button" onClick={() => chooseBranch("谨慎分支：删除短信")}>
-                  删除短信 <i style={{ width: "24%" }} /><small>24% 选择</small>
+                <button type="button" onClick={() => { window.location.href = playHref; }}>
+                  {activeChoiceLabels[1]}
+                  <small>进入完整播放器选择</small>
                 </button>
               </div>
               <div className="mobile-df-rewrite-bar">
@@ -360,7 +377,7 @@ export function MobileDreamFrameApp() {
                   <i className="fa-solid fa-wand-magic-sparkles" />
                   一句话改写剧情
                 </button>
-                <Link href={lp(activeStory.href)}>
+                <Link href={playHref}>
                   播放 <i className="fa-solid fa-arrow-right" />
                 </Link>
               </div>
@@ -371,7 +388,7 @@ export function MobileDreamFrameApp() {
         {tab === "worldline" && (
           <section className="mobile-df-scroll-screen">
             <PageHead
-              title="世界线"
+              title="我的世界线"
               pill={worldMode === "player" ? "玩家视角 · 防剧透" : "创作者视角 · 全量管理"}
               onBack={() => go("feed")}
             />
@@ -395,16 +412,16 @@ export function MobileDreamFrameApp() {
             {worldMode === "player" ? (
               <div className="mobile-df-list">
                 <WorldItem
-                  state="最火分支 · 2.1万游玩"
+                  state="公开分支 · 预览"
                   title="Coco 的分支：她在宴会开始前离开"
-                  text="从“收到短信”节点变化，沈知遥在停车场遇见另一个自己。"
-                  meta={["热度 96", "可试玩", "收益已分账"]}
+                  text="从“收到短信”节点变化，分支详情为示例展示，尚未接入实时数据。"
+                  meta={["示例数据", "可试玩", "收益未接入"]}
                 />
                 <WorldItem
-                  state="作者推荐"
+                  state="作者推荐 · 预览"
                   title="Mia 的分支：周远其实是 AI 生成的人物"
                   text="解锁第2章后可见完整节点，当前只显示无剧透摘要。"
-                  meta={["热度 82", "第2章", "角色卡联动"]}
+                  meta={["数据未接入", "第2章", "角色卡联动"]}
                 />
                 <WorldItem
                   state="第4章 · 未解锁"
@@ -426,7 +443,7 @@ export function MobileDreamFrameApp() {
                   state="可升级视频"
                   title="Coco 的停车场分支"
                   text="高赞分支可排队生成视频资产，横屏/竖屏分开缓存。"
-                  meta={["完播 64%", "点赞 2.4万", "建议升级"]}
+                  meta={["完播数据未接入", "点赞待上线", "预览"]}
                 />
                 <WorldItem
                   state="隐藏节点 · 后台可编辑"
@@ -444,7 +461,7 @@ export function MobileDreamFrameApp() {
         )}
 
         {tab === "create" && (
-          <section className="mobile-df-scroll-screen">
+          <section className="mobile-df-scroll-screen mobile-df-create-screen">
             <PageHead title="＋创作" pill="先轻后重" onBack={() => go("feed")} />
             <div className="mobile-df-create-grid">
               {createActions.map((action) => (
@@ -453,8 +470,8 @@ export function MobileDreamFrameApp() {
                   type="button"
                   className={action.title === "导入小说" ? "wide" : ""}
                   onClick={() => {
-                    if (action.title === "导入小说") setTip("已进入小说导入，自动拆章和提取互动节点");
-                    else setTip(`${action.title}入口已接入创作流`);
+                    if (action.title === "导入小说") setTip("小说导入为预览入口：尚未接入自动拆章与节点提取。");
+                    else setTip(`${action.title}：预览入口，尚未接入生成流程。`);
                   }}
                 >
                   <i className={`fa-solid ${action.icon}`} />
@@ -476,7 +493,7 @@ export function MobileDreamFrameApp() {
             <div className="mobile-df-panel">
               <div className="mobile-df-panel-head">
                 <h3>导入小说生成互动影游</h3>
-                <span>10 集草稿</span>
+                <span>示例结构</span>
               </div>
               <textarea
                 value={storySeed}
@@ -485,9 +502,9 @@ export function MobileDreamFrameApp() {
                 aria-label="小说或故事文本"
               />
               <div className="mobile-df-mini-stats">
-                <span><strong>8人</strong>角色卡</span>
-                <span><strong>12处</strong>关键节点</span>
-                <span><strong>2套</strong>横竖屏资产</span>
+                <span><strong>示例</strong>角色卡</span>
+                <span><strong>示例</strong>关键节点</span>
+                <span><strong>示例</strong>横竖屏资产</span>
               </div>
               <div className="mobile-df-row-actions mobile-df-single-action">
                 <button type="button" onClick={() => setTip("支持粘贴文本或上传小说文档")}>
@@ -560,7 +577,7 @@ export function MobileDreamFrameApp() {
                       >
                         预览
                       </button>
-                      <Link href={lp(story.href)}>继续观看</Link>
+                      <Link href={withMobileReturnTo(lp(story.href))}>继续观看</Link>
                     </div>
                   </div>
                 </article>
@@ -613,7 +630,7 @@ export function MobileDreamFrameApp() {
             <div className="mobile-df-stat-grid">
               <StatPill
                 label={t("home.ui.credits")}
-                value={formatCredits(creditBalance, locale)}
+                value={creditSource === "unavailable" ? "未开通" : formatCredits(creditBalance, locale)}
               />
               <StatPill label="今日收益" value="+36" />
               <StatPill label="分支游玩" value="+24" />
@@ -691,16 +708,19 @@ export function MobileDreamFrameApp() {
               <div className="mobile-df-sheet-handle" />
               {sheet === "rewrite" && (
                 <>
-                  <h2>生成你的个人世界线</h2>
+                  <h2>一句话改写（草稿，未生成）</h2>
                   <textarea
                     value={rewriteSeed}
                     onChange={(event) => setRewriteSeed(event.target.value)}
                     rows={4}
-                    aria-label="一句话改写剧情"
+                    aria-label="一句话改写剧情草稿"
                   />
                   <div className="mobile-df-preview-box">
-                    <strong>你的世界线即将发生：</strong>
-                    <p>沈知遥提前离场，停车场的后视镜里出现了十年前的自己。</p>
+                    <strong>当前页面草稿（未生成分支或关键画面）：</strong>
+                    <p>
+                      改写内容只留在当前页面，收起后不会写入本地存储；刷新或离开后不会保留。
+                      预览版不会调用付费模型，也不会生成新的世界线。
+                    </p>
                   </div>
                   <div className="mobile-df-row-actions">
                     <button type="button" onClick={() => setSheet(null)}>继续原剧情</button>
@@ -708,51 +728,63 @@ export function MobileDreamFrameApp() {
                       type="button"
                       className="primary"
                       onClick={() => {
+                        const draft = rewriteDraftNotice(rewriteSeed);
                         setSheet(null);
-                        setTip("已生成文字预览和关键画面，可继续升级为视频");
+                        setTip(draft.message);
                       }}
                     >
-                      生成分支
+                      收起草稿
                     </button>
                   </div>
                 </>
               )}
               {sheet === "role" && (
                 <>
-                  <h2>沈知遥 · 当前角色卡</h2>
-                  <div className="mobile-df-role-card">
-                    <img src={`${MOBILE_ASSET_ROOT}/history-missing-graduation.png`} alt="沈知遥角色卡" />
-                    <div>
-                      <p>敏感、克制，擅长从旧照片和短信里找真相。</p>
-                      <div className="mobile-df-mini-stats">
-                        <span>声线：低语</span>
-                        <span>授权：可二创</span>
-                        <span>引用：18</span>
+                  <h2>{roleCard.available ? `${roleCard.name} · 当前角色卡` : "当前剧集角色卡"}</h2>
+                  {roleCard.available ? (
+                    <div className="mobile-df-role-card">
+                      <div>
+                        <p>{roleCard.description}</p>
+                        <div className="mobile-df-mini-stats">
+                          {roleCard.traits.map((trait) => (
+                            <span key={trait}>{trait}</span>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="mobile-df-row-actions">
-                    <button type="button" onClick={() => setTip("角色卡已收藏")}>收藏</button>
-                    <button type="button" className="primary" onClick={() => setTip("已加入我的故事")}>加入故事</button>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="mobile-df-preview-box">
+                        <strong>{roleCard.title}</strong>
+                        <p>{roleCard.description}</p>
+                      </div>
+                      <div className="mobile-df-row-actions">
+                        <button type="button" disabled>收藏</button>
+                        <button type="button" className="primary" disabled>加入故事</button>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
               {sheet === "worldline" && (
                 <>
-                  <h2>当前剧集世界线</h2>
+                  <h2>我的世界线</h2>
                   <WorldItem
-                    state="最火分支"
+                    state="玩家公开分支 · 预览"
                     title="Coco 的分支：宴会开始前离开"
-                    text="从“收到短信”节点变化，沈知遥在停车场遇见另一个自己。"
-                    meta={["热度 96", "游玩 2.1万"]}
+                    text="从“收到短信”节点变化，分支详情以预热示例展示，尚未接入实时数据。"
+                    meta={["示例分支", "数据未接入"]}
                   />
                   <WorldItem
-                    state="第4章 · 未解锁"
+                    state="防剧透分支 · 未解锁"
                     title="隐藏分支：毕业照里真正消失的人"
-                    text="完成第3章后显示分支摘要。"
-                    meta={["防剧透"]}
+                    text="完成对应章节后才会显示分支摘要，预览版不展示隐藏内容。"
+                    meta={["防剧透", "未解锁"]}
                     locked
                   />
+                  <Link className="mobile-df-wide-link" href={playHref}>
+                    继续播放 {activeStory.title}
+                  </Link>
                   <Link className="mobile-df-wide-link" href={lp("/worldline")}>
                     打开完整世界线
                   </Link>

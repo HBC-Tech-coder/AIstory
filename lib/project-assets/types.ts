@@ -17,6 +17,7 @@ export type ProjectAsset = {
   provider: GenerationJobProvider;
   modality: ComfyUIModality;
   status: "ready";
+  releaseClassification?: "non_publishable";
   name: string;
   url: string;
   contentHash: string;
@@ -28,11 +29,19 @@ export type ProjectAsset = {
     version: number;
   };
   seed?: number;
-  provenance: {
-    source: "aistory-generation-job";
-    requestFingerprint: string;
-    generationStatus: Extract<GenerationJobStatus, "succeeded">;
-  };
+  provenance:
+    | {
+        source: "aistory-generation-job";
+        requestFingerprint: string;
+        generationStatus: Extract<GenerationJobStatus, "succeeded">;
+      }
+    | {
+        source: "aistory-video-ab-experiment";
+        experimentId: string;
+        runId: string;
+        variantId: "A" | "B";
+        workflowSha256: string;
+      };
   generatedAt: string;
   createdAt: string;
 };

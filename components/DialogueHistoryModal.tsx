@@ -68,13 +68,13 @@ export function DialogueHistoryModal({
         } max-h-[72dvh] overflow-hidden`}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "rgba(14, 10, 6, 0.88)",
-          border: "1.5px solid rgba(175, 138, 72, 0.72)",
+          background: "rgba(3, 8, 22, 0.9)",
+          border: "1.5px solid rgba(88, 120, 255, 0.62)",
           borderRadius: "6px",
           backdropFilter: "blur(14px)",
           WebkitBackdropFilter: "blur(14px)",
           boxShadow:
-            "0 10px 42px rgba(0,0,0,0.62), inset 0 1px 0 rgba(200,165,90,0.12)",
+            "0 10px 42px rgba(0,0,0,0.62), inset 0 1px 0 rgba(151,174,255,0.12)",
         }}
         role="dialog"
         aria-modal="true"
@@ -104,7 +104,7 @@ export function DialogueHistoryModal({
         >
           {decisions.length > 0 && (
             <div className="mb-4 space-y-3">
-              <p className="text-[10px] smallcaps text-[rgba(205,165,90,0.92)]">
+              <p className="text-[10px] smallcaps text-[rgba(151,174,255,0.92)]">
                 关键抉择 · {decisions.length}
               </p>
               {decisions.map((decision) => (
@@ -126,7 +126,7 @@ export function DialogueHistoryModal({
                         <span>·</span>
                         <span>{new Date(decision.createdAt).toLocaleString()}</span>
                         {decision.branchId === activeBranchId && (
-                          <span className="rounded-full border border-amber-400/40 px-2 py-0.5 text-amber-200">
+                          <span className="rounded-full border border-blue-400/40 px-2 py-0.5 text-blue-200">
                             当前路线
                           </span>
                         )}
@@ -152,8 +152,8 @@ export function DialogueHistoryModal({
                           onClick={() => onReselect?.(decision, choice.id)}
                           className={`min-w-0 rounded border px-3 py-2 text-left text-[12px] ${
                             selected
-                              ? "border-amber-400/50 bg-amber-400/10 text-amber-100"
-                              : "border-cream-50/15 text-cream-50/75 hover:border-amber-400/40"
+                              ? "border-blue-400/50 bg-blue-400/10 text-blue-100"
+                              : "border-cream-50/15 text-cream-50/75 hover:border-blue-400/40"
                           } disabled:cursor-default disabled:opacity-65`}
                         >
                           <span className="block truncate">
@@ -196,7 +196,7 @@ export function DialogueHistoryModal({
                       {t("history.scene", { n: String(item.sceneIndex).padStart(3, "0") })}
                     </span>
                     {item.speaker && (
-                      <span className="font-serif text-[12px] text-[rgba(205,165,90,0.92)]">
+                      <span className="font-serif text-[12px] text-[rgba(151,174,255,0.92)]">
                         {renderPersonalizedSpeaker(item.speaker, playerName, defaultPlayerName, characters)}
                       </span>
                     )}
@@ -206,7 +206,7 @@ export function DialogueHistoryModal({
                       className={`font-serif leading-[1.7] ${
                         item.body ? "mb-1" : ""
                       } ${portrait ? "text-[14px]" : "text-[12px]"}`}
-                      style={{ color: "rgba(228,218,196,0.85)" }}
+                      style={{ color: "rgba(221,229,255,0.85)" }}
                     >
                       {renderPersonalizedText(item.narration, playerName, defaultPlayerName, characters)}
                     </p>
@@ -216,14 +216,14 @@ export function DialogueHistoryModal({
                       className={`font-serif leading-[1.75] ${
                         portrait ? "text-[15px]" : "text-[13px]"
                       }`}
-                      style={{ color: "rgba(245,235,210,0.94)" }}
+                      style={{ color: "rgba(245,248,255,0.94)" }}
                     >
                       {renderPersonalizedText(item.body, playerName, defaultPlayerName, characters)}
                     </p>
                   )}
                   {item.selectedChoice && (
-                    <p className="mt-2 inline-flex max-w-full items-start gap-2 rounded-[5px] border border-[rgba(180,140,80,0.35)] bg-[rgba(180,140,60,0.10)] px-2.5 py-1.5 font-serif text-[12px] leading-snug text-cream-50/85">
-                      <span className="shrink-0 text-[rgba(195,155,75,0.9)]">
+                    <p className="mt-2 inline-flex max-w-full items-start gap-2 rounded-[5px] border border-[rgba(88,120,255,0.35)] bg-[rgba(49,91,255,0.10)] px-2.5 py-1.5 font-serif text-[12px] leading-snug text-cream-50/85">
+                      <span className="shrink-0 text-[rgba(151,174,255,0.92)]">
                         {t("history.choice")}
                       </span>
                       <span>{renderPersonalizedText(item.selectedChoice, playerName, defaultPlayerName, characters)}</span>

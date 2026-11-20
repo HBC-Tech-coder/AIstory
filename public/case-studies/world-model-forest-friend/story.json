@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 1,
+  "kind": "aistory-authored-case",
+  "card": {
+    "id": "world-model-forest-friend",
+    "gender": "男性向",
+    "index": 0,
+    "title": "森林里的新朋友",
+    "outline": "野外丛林第一视角互动，一次投喂引出树影深处尚未揭开的线索。",
+    "style": "世界模型生成 · 第一视角互动演示",
+    "tags": [
+      "世界模型生成",
+      "第一视角演示",
+      "作者锁定"
+    ],
+    "coverPath": "/case-studies/world-model-forest-friend/assets/poster.jpg",
+    "playPath": "/play?case=world-model-forest-friend",
+    "assetStatus": "ready",
+    "active": true
+  },
+  "session": {
+    "id": "case:world-model-forest-friend",
+    "createdAt": 1786320000000,
+    "worldSetting": "野外丛林第一视角互动，一次投喂引出树影深处尚未揭开的线索。",
+    "styleGuide": "世界模型生成的第一视角视频，保持原片画面与声音。",
+    "history": [
+      {
+        "scene": {
+          "id": "world-model-forest-friend:video",
+          "scenePrompt": "世界模型第一视角互动演示：森林里的新朋友",
+          "entryBeatId": "world-model-forest-friend:after-video",
+          "sceneKey": "world-model-forest-friend",
+          "imageUrl": "/case-studies/world-model-forest-friend/assets/poster.jpg",
+          "orientation": "landscape",
+          "media": {
+            "kind": "video",
+            "url": "/api/video-assets/world-model-demos/world-model-forest-friend/content",
+            "posterUrl": "/case-studies/world-model-forest-friend/assets/poster.jpg",
+            "durationMs": 138900,
+            "hasAudio": true,
+            "endBehavior": "unlock-interaction",
+            "allowSkip": true,
+            "hotspotsEnabled": false
+          },
+          "beats": [
+            {
+              "id": "world-model-forest-friend:after-video",
+              "narration": "小家伙跑出几步，又回头看你。树影深处似乎还有另一双眼睛。",
+              "next": {
+                "type": "choice",
+                "choices": [
+                  {
+                    "id": "world-model-forest-friend:follow-quietly:choice",
+                    "label": "【选项】安静跟上它",
+                    "effect": {
+                      "kind": "change-scene",
+                      "nextSceneSeed": "author-locked:world-model-forest-friend:follow-quietly",
+                      "authoredTargetNodeId": "world-model-forest-friend:follow-quietly"
+                    }
+                  },
+                  {
+                    "id": "world-model-forest-friend:leave-food:choice",
+                    "label": "【选项】把食物留在原地观察",
+                    "effect": {
+                      "kind": "change-scene",
+                      "nextSceneSeed": "author-locked:world-model-forest-friend:leave-food",
+                      "authoredTargetNodeId": "world-model-forest-friend:leave-food"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "visitedBeatIds": [
+          "world-model-forest-friend:after-video"
+        ],
+        "storyStateAfter": {
+          "logline": "小家伙跑出几步，又回头看你。树影深处似乎还有另一双眼睛。",
+          "genreTags": "世界模型 / 第一视角 / 互动视频 / 作者锁定",
+          "protagonist": "你以第一人称进入一段世界模型生成的影像，并在结尾决定故事下一步。",
+          "castNotes": "演示角色与动物仅用于本地作者锁定互动，不触发模型续写。",
+          "synopsis": "野外丛林第一视角互动，一次投喂引出树影深处尚未揭开的线索。",
+          "openThreads": [
+            "小家伙跑出几步，又回头看你。树影深处似乎还有另一双眼睛。"
+          ],
+          "relationships": [],
+          "nextHook": "视频结束后，由玩家选择下一步。"
+        }
+      }
+    ],
+    "characters": [],
+    "storyState": {
+      "logline": "小家伙跑出几步，又回头看你。树影深处似乎还有另一双眼睛。",
+      "genreTags": "世界模型 / 第一视角 / 互动视频 / 作者锁定",
+      "protagonist": "你以第一人称进入一段世界模型生成的影像，并在结尾决定故事下一步。",
+      "castNotes": "演示角色与动物仅用于本地作者锁定互动，不触发模型续写。",
+      "synopsis": "野外丛林第一视角互动，一次投喂引出树影深处尚未揭开的线索。",
+      "openThreads": [
+        "小家伙跑出几步，又回头看你。树影深处似乎还有另一双眼睛。"
+      ],
+      "relationships": [],
+      "nextHook": "视频结束后，由玩家选择下一步。"
+    },
+    "orientation": "landscape",
+    "language": "zh-CN",
+    "cacheIdentity": {
+      "visibility": "public",
+      "storyId": "case:world-model-forest-friend",
+      "templateId": "world-model-forest-friend",
+      "version": "world-model-demo-v1"
+    },
+    "authoredStory": {
+      "caseStudyId": "world-model-forest-friend",
+      "version": "author-locked-world-model-demo-v1",
+      "authorLocked": true,
+      "releasePolicy": {
+        "defaultAccess": "public",
+        "restrictedNodeIds": []
+      },
+      "currentNodeId": "world-model-forest-friend:start",
+      "currentBeatId": "world-model-forest-friend:after-video",
+      "visitedNodeIds": [
+        "world-model-forest-friend:start"
+      ],
+      "variables": {},
+      "variableDefinitions": [],
+      "nodes": [
+        {
+          "nodeId": "world-model-forest-friend:start",
+          "sourceSceneId": "world-model-forest-friend-video",
+          "title": "森林里的新朋友",
+          "kind": "video",
+          "episodeId": "world-model-demo",
+          "sourceParagraphIds": [
+            "world-model-forest-friend:video"
+          ],
+          "releasePolicy": "public",
+          "scene": {
+            "id": "world-model-forest-friend:video",
+            "scenePrompt": "世界模型第一视角互动演示：森林里的新朋友",
+            "entryBeatId": "world-model-forest-friend:after-video",
+            "sceneKey": "world-model-forest-friend",
+            "imageUrl": "/case-studies/world-model-forest-friend/assets/poster.jpg",
+            "orientation": "landscape",
+            "media": {
+              "kind": "video",
+              "url": "/api/video-assets/world-model-demos/world-model-forest-friend/content",
+              "posterUrl": "/case-studies/world-model-forest-friend/assets/poster.jpg",
+              "durationMs": 138900,
+              "hasAudio": true,
+              "endBehavior": "unlock-interaction",
+              "allowSkip": true,
+              "hotspotsEnabled": false
+            },
+            "beats": [
+              {
+                "id": "world-model-forest-friend:after-video",
+                "narration": "小家伙跑出几步，又回头看你。树影深处似乎还有另一双眼睛。",
+                "next": {
+                  "type": "choice",
+                  "choices": [
+                    {
+                      "id": "world-model-forest-friend:follow-quietly:choice",
+                      "label": "【选项】安静跟上它",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "author-locked:world-model-forest-friend:follow-quietly",
+                        "authoredTargetNodeId": "world-model-forest-friend:follow-quietly"
+                      }
+                    },
+                    {
+                      "id": "world-model-forest-friend:leave-food:choice",
+                      "label": "【选项】把食物留在原地观察",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "author-locked:world-model-forest-friend:leave-food",
+                        "authoredTargetNodeId": "world-model-forest-friend:leave-food"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "nodeId": "world-model-forest-friend:follow-quietly",
+          "sourceSceneId": "follow-quietly-ending",
+          "title": "安静跟上它",
+          "kind": "ending",
+          "episodeId": "world-model-demo",
+          "sourceParagraphIds": [
+            "world-model-forest-friend:follow-quietly"
+          ],
+          "releasePolicy": "public",
+          "scene": {
+            "id": "world-model-forest-friend:follow-quietly:scene",
+            "scenePrompt": "世界模型互动演示结尾：安静跟上它",
+            "entryBeatId": "world-model-forest-friend:follow-quietly:beat",
+            "sceneKey": "world-model-forest-friend-ending",
+            "imageUrl": "/case-studies/world-model-forest-friend/assets/poster.jpg",
+            "orientation": "landscape",
+            "media": {
+              "kind": "image",
+              "url": "/case-studies/world-model-forest-friend/assets/poster.jpg"
+            },
+            "beats": [
+              {
+                "id": "world-model-forest-friend:follow-quietly:beat",
+                "narration": "你放轻脚步跟进林间。小家伙始终保持不远不近的距离，像是在为你带路。",
+                "next": {
+                  "type": "choice",
+                  "choices": []
+                }
+              }
+            ]
+          }
+        },
+        {
+          "nodeId": "world-model-forest-friend:leave-food",
+          "sourceSceneId": "leave-food-ending",
+          "title": "把食物留在原地观察",
+          "kind": "ending",
+          "episodeId": "world-model-demo",
+          "sourceParagraphIds": [
+            "world-model-forest-friend:leave-food"
+          ],
+          "releasePolicy": "public",
+          "scene": {
+            "id": "world-model-forest-friend:leave-food:scene",
+            "scenePrompt": "世界模型互动演示结尾：把食物留在原地观察",
+            "entryBeatId": "world-model-forest-friend:leave-food:beat",
+            "sceneKey": "world-model-forest-friend-ending",
+            "imageUrl": "/case-studies/world-model-forest-friend/assets/poster.jpg",
+            "orientation": "landscape",
+            "media": {
+              "kind": "image",
+              "url": "/case-studies/world-model-forest-friend/assets/poster.jpg"
+            },
+            "beats": [
+              {
+                "id": "world-model-forest-friend:leave-food:beat",
+                "narration": "你退到树后安静等待。片刻后，树影里的第二个身影终于试探着走了出来。",
+                "next": {
+                  "type": "choice",
+                  "choices": []
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "assetSummary": {
+    "generated": 2,
+    "pending": 0,
+    "failed": 0
+  }
+}

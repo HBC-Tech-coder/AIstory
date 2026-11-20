@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/supabase/guard";
+import {
+  rejectUnboundCloudProgressPrincipal,
+  requireUser,
+} from "@/lib/supabase/guard";
 import { cloudSoftDeleteStory } from "@/lib/persistence/cloudStore";
 
 export const runtime = "nodejs";
@@ -11,6 +14,8 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   const auth = await requireUser();
   if (auth instanceof NextResponse) return auth;
+  const principalRejection = rejectUnboundCloudProgressPrincipal(auth);
+  if (principalRejection) return principalRejection;
 
   let body: { id?: unknown; rev?: unknown; deletedAt?: unknown };
   try {

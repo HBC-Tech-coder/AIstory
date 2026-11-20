@@ -1,0 +1,35 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false
+  },
+  "include": [
+    "next-env.d.ts",
+    "types/**/*.d.ts",
+    "lib/admin/independentPrincipal.ts",
+    "lib/admin/independentPrincipalRepository.ts",
+    "lib/admin/independentPrincipalServer.ts",
+    "lib/admin/security.ts",
+    "lib/admin/service.ts",
+    "lib/admin/supabaseRepository.ts",
+    "lib/admin/types.ts",
+    "lib/production/databaseGate.ts",
+    "app/api/admin/session/route.ts",
+    "app/api/admin/snapshot/route.ts",
+    "app/admin/login/page.tsx",
+    "app/admin/login/AdminLoginForm.tsx",
+    "app/admin/page.tsx",
+    "app/admin/AdminConsole.tsx",
+    "scripts/initialize-production-independent-admin-principal.ts",
+    "scripts/test-independent-admin-principal-production.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next/cache",
+    ".tmp",
+    "app/app",
+    "components/components",
+    "lib/lib"
+  ]
+}

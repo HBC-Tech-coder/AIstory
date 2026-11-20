@@ -77,7 +77,7 @@ export function DreamFrameDashboardPage({ mode }: { mode: DashboardMode }) {
               <i className={`fa-solid ${theme === "night" ? "fa-sun" : "fa-moon"} mr-2 text-xs`} />
               {theme === "night" ? "白天" : "夜晚"}
             </button>
-            <span className="flex h-10 w-10 items-center justify-center bg-ember-500/80 font-semibold text-cream-50">Y</span>
+            <span className="flex h-10 w-10 items-center justify-center bg-ember-500 font-semibold text-white">Y</span>
           </div>
         </div>
       </header>
@@ -128,7 +128,7 @@ function PlayerWorldlineView() {
     <section className="grid gap-5 p-5 md:p-8 xl:grid-cols-[340px_minmax(0,1fr)]">
       <aside className="df-panel border">
         <div className="df-panel-header border-b px-5 py-4">
-          <h1 className="df-heading text-xl font-semibold">我的时间线</h1>
+          <h1 className="df-heading text-xl font-semibold">我的世界线</h1>
           <p className="df-muted mt-1 text-xs">旧路线永久保留，可随时切回</p>
         </div>
         <div className="space-y-2 p-3">
@@ -274,13 +274,13 @@ function WorldlineView() {
       <section className="df-panel relative min-h-[680px] overflow-hidden border">
         <div className="absolute inset-0 opacity-70" style={{
           backgroundImage:
-            "linear-gradient(rgba(45,24,16,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(45,24,16,0.06) 1px, transparent 1px)",
+            "linear-gradient(var(--df-border) 1px, transparent 1px), linear-gradient(90deg, var(--df-border) 1px, transparent 1px)",
           backgroundSize: "48px 48px",
         }} />
         <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <path d="M23 37 C38 44, 46 46, 51 45 S69 33, 75 31" fill="none" stroke="rgba(178,147,73,.35)" strokeWidth="0.45" />
-          <path d="M52 48 C58 55, 66 60, 75 65" fill="none" stroke="rgba(78,142,126,.3)" strokeWidth="0.45" />
-          <path d="M42 48 C39 57, 37 65, 40 76" fill="none" stroke="rgba(178,147,73,.25)" strokeWidth="0.35" />
+          <path d="M23 37 C38 44, 46 46, 51 45 S69 33, 75 31" fill="none" stroke="var(--df-accent)" strokeOpacity="0.35" strokeWidth="0.45" />
+          <path d="M52 48 C58 55, 66 60, 75 65" fill="none" stroke="var(--df-positive)" strokeOpacity="0.3" strokeWidth="0.45" />
+          <path d="M42 48 C39 57, 37 65, 40 76" fill="none" stroke="var(--df-accent)" strokeOpacity="0.25" strokeWidth="0.35" />
         </svg>
         {nodes.map((node) => (
           <div
@@ -334,7 +334,7 @@ function CreatorView() {
               <h2 className="df-heading mt-4 text-2xl font-semibold">{title}</h2>
               <p className="df-copy mt-4 text-sm leading-7">{text}</p>
               <div className="df-progress-track mt-6 h-2">
-                <div className="h-full bg-gradient-to-r from-amber-700 to-teal-600" style={{ width: `${progress}%` }} />
+                <div className="h-full bg-ember-500" style={{ width: `${progress}%` }} />
               </div>
             </article>
           ))}
@@ -386,7 +386,7 @@ function RevenueView() {
         <div className="flex h-56 items-end gap-4 px-6 pb-8 pt-4">
           {bars.map((bar, index) => (
             <div key={index} className="flex flex-1 flex-col items-center gap-3">
-              <div className="w-full bg-gradient-to-t from-teal-200 to-amber-700" style={{ height: `${bar}%` }} />
+              <div className="w-full bg-ember-500" style={{ height: `${bar}%` }} />
               <span className="df-muted text-sm">周{["一", "二", "三", "四", "五", "六", "日"][index]}</span>
             </div>
           ))}

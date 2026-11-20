@@ -250,6 +250,14 @@ Dreamy watercolor style with soft tones and nostalgic atmosphere
     error: {
       title: "Something went wrong",
       back: "Back",
+      platformUnavailableEyebrow: "Generation service",
+      platformUnavailableTitle: "Platform generation is not available yet",
+      platformUnavailableDescription:
+        "You can still explore existing stories, author-locked episodes, and cached content anonymously, or configure your own API to keep creating.",
+      platformUnavailableSafety:
+        "No platform model call was made, and no unverified price or balance is shown.",
+      chooseFreeStory: "Explore free stories",
+      configureByok: "Configure my API",
     },
 
     previousStep: "Previous action",
@@ -300,6 +308,19 @@ Dreamy watercolor style with soft tones and nostalgic atmosphere
 
     models: {
       byokTitle: "My API (BYOK)",
+      custodyDevice: "This browser only",
+      custodyDeviceHint: "Keeps the existing sessionStorage/localStorage behavior. Keys are not saved to your AIstory account.",
+      custodyHosted: "Hosted across devices",
+      custodyHostedHint: "After login and recent verification, save on PC and use from phone or iPad.",
+      hostedDisclosureTitle: "Encrypt and sync to account (Optional)",
+      hostedDisclosure: "The credential is encrypted at rest. When you explicitly use it, the AIstory server must briefly decrypt it in memory to call your provider. This is not end-to-end encryption, and administrators have no API to read or export the original key. Your provider bills you; AIstory credits are not charged.",
+      hostedReady: "The hosted vault and recent-verification gate are ready. Saving does not test the provider.",
+      hostedUnavailable: "Cross-device hosting is not enabled. Continue with this-browser-only mode.",
+      hostedFieldsMissing: "Enter Provider, Base URL, Model, and API Key for the selected capability.",
+      hostedSave: "Encrypt and sync capability",
+      hostedWorking: "Working…",
+      hostedDelete: "Delete",
+      hostedTtsPending: "The hosted TTS contract is reserved. The current TTS form remains browser-only and is never uploaded automatically.",
       costResponsibility: "Use my keys: charges are billed by your selected providers. Platform credits are not publicly available and remain internal-test only.",
       callEstimate: "Starting or continuing a story normally calls text and image capabilities. Vision, TTS, and video are called only when their features are used. Check your provider bill for actual charges.",
       persistenceSession: "This session only (Default)",
@@ -381,15 +402,20 @@ Dreamy watercolor style with soft tones and nostalgic atmosphere
     phoneLogin: "Phone Login / Sign Up",
     registrationHint:
       "A verified unregistered number is registered automatically. The current policy grants 1,000 credits once to a newly registered account.",
+    localProgressHint:
+      "Sign in to keep eligible story progress in this browser. API keys are never read or uploaded.",
     phonePlaceholder: "Mainland China phone number",
     sendCode: "Get SMS Code",
     sending: "Sending...",
+    resendCode: "Get another code",
+    resendCountdown: "Get another code ({seconds}s)",
 
-    phoneCodeSent: "Verification code sent to {phone}",
+    phoneCodeSent: "Code requested for {phone}. Enter the code when the text arrives.",
     codePlaceholder: "6-digit code",
     verify: "Confirm",
     verifying: "Verifying...",
     resend: "Resend",
+    changePhone: "Use another number",
 
     close: "Close",
     ariaLabel: "Phone login or sign up",
@@ -399,6 +425,20 @@ Dreamy watercolor style with soft tones and nostalgic atmosphere
     phoneInvalid: "Enter a valid mainland China phone number.",
     smsRateLimited: "Too many code requests. Please try again later.",
     smsUnavailable: "SMS is temporarily unavailable. No code was sent.",
+    claimCompleteTitle: "Signed in",
+    claimNotFound: "No eligible local story progress was found. Sign-in is complete.",
+    claimSummary:
+      "Inherited {stories} stories and {checkpoints} checkpoints; {skipped} items were skipped due to version or release status.",
+    claimSkipReasonSummary: "Skipped categories: {reasons}",
+    claimSkipNotPublished: "unpublished or restricted content",
+    claimSkipVersionMismatch: "version mismatch",
+    claimSkipNodeUnavailable: "node unavailable",
+    claimSkipResourceUnavailable: "cache unavailable",
+    claimSkipAssignmentUnavailable: "experiment unavailable",
+    claimSkipManifestInvalid: "manifest conflict",
+    claimRetryHint: "The local index switch is pending and will safely retry after refresh.",
+    sameBrowserOnly: "This phase supports same-browser inheritance only, not cross-device sync.",
+    continue: "Continue",
   },
 
   // ========== Dialogue History Modal ==========

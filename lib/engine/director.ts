@@ -292,14 +292,14 @@ export async function directScene(
       resolvePlan(extracted);
     }
     return result;
-  }).catch((err): StreamRouterResult => {
+  }).catch((): StreamRouterResult => {
     // routeTaggedStream rejected (stream read / network failure) BEFORE onPlan
     // fired. Without this, planPromise would never settle and `await
     // planPromise` below would hang the whole request FOREVER. Settle the plan
     // with a minimal fallback and resolve routing to a degraded result so the
     // pipeline produces a playable fallback scene (graceful degradation) rather
     // than hanging or hard-crashing.
-    console.warn("[directScene] routeTaggedStream rejected, degrading:", err);
+    console.warn("[directScene] writer stream unavailable; using safe degradation.");
     if (!planSettled) {
       planSettled = true;
       resolvePlan(minimalFallbackPlan());
@@ -349,9 +349,8 @@ export async function directScene(
 
   const cardPromises = newCharNames.map((name) =>
     designCharacterCard(config, session, name, findIntent(name)).catch(
-      (err): CharacterCard => {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[directScene] designCharacterCard(${name}) failed: ${msg}`);
+      (): CharacterCard => {
+        console.error("[directScene] character-card generation failed; using safe fallback.");
         const voiceProfile = matchVoiceProfile({
           name,
           role: session.storyState?.castNotes,
@@ -684,14 +683,17 @@ export async function directInsertBeat(
   config: ProviderConfig,
   session: Session,
   freeformAction: string,
+  hooks: Readonly<{ onProviderStarted?: () => void }> = {},
 ): Promise<InsertBeatPartial[]> {
+  const userMessage = buildInsertBeatUserMessage(session, freeformAction);
+  hooks.onProviderStarted?.();
   const raw = await chat(
     config,
     [
       { role: "system", content: INSERT_BEAT_SYSTEM },
       {
         role: "user",
-        content: buildInsertBeatUserMessage(session, freeformAction),
+        content: userMessage,
       },
     ],
     { temperature: 0.9, tag: "insert-beat" },

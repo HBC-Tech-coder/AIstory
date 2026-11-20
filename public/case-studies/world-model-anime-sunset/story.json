@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 1,
+  "kind": "aistory-authored-case",
+  "card": {
+    "id": "world-model-anime-sunset",
+    "gender": "男性向",
+    "index": 0,
+    "title": "夕照下的约定",
+    "outline": "二次元第一视角相遇，在海边晚霞里把一次回应变成共同记忆。",
+    "style": "世界模型生成 · 第一视角互动演示",
+    "tags": [
+      "世界模型生成",
+      "第一视角演示",
+      "作者锁定"
+    ],
+    "coverPath": "/case-studies/world-model-anime-sunset/assets/poster.jpg",
+    "playPath": "/play?case=world-model-anime-sunset",
+    "assetStatus": "ready",
+    "active": true
+  },
+  "session": {
+    "id": "case:world-model-anime-sunset",
+    "createdAt": 1786320000000,
+    "worldSetting": "二次元第一视角相遇，在海边晚霞里把一次回应变成共同记忆。",
+    "styleGuide": "世界模型生成的第一视角视频，保持原片画面与声音。",
+    "history": [
+      {
+        "scene": {
+          "id": "world-model-anime-sunset:video",
+          "scenePrompt": "世界模型第一视角互动演示：夕照下的约定",
+          "entryBeatId": "world-model-anime-sunset:after-video",
+          "sceneKey": "world-model-anime-sunset",
+          "imageUrl": "/case-studies/world-model-anime-sunset/assets/poster.jpg",
+          "orientation": "landscape",
+          "media": {
+            "kind": "video",
+            "url": "/api/video-assets/world-model-demos/world-model-anime-sunset/content",
+            "posterUrl": "/case-studies/world-model-anime-sunset/assets/poster.jpg",
+            "durationMs": 78340,
+            "hasAudio": true,
+            "endBehavior": "unlock-interaction",
+            "allowSkip": true,
+            "hotspotsEnabled": false
+          },
+          "beats": [
+            {
+              "id": "world-model-anime-sunset:after-video",
+              "narration": "她把耳边的碎发别好，夕阳落进眼睛里：“下次见面，你还会记得今天吗？”",
+              "next": {
+                "type": "choice",
+                "choices": [
+                  {
+                    "id": "world-model-anime-sunset:walk-by-the-river:choice",
+                    "label": "【选项】约她沿河继续走",
+                    "effect": {
+                      "kind": "change-scene",
+                      "nextSceneSeed": "author-locked:world-model-anime-sunset:walk-by-the-river",
+                      "authoredTargetNodeId": "world-model-anime-sunset:walk-by-the-river"
+                    }
+                  },
+                  {
+                    "id": "world-model-anime-sunset:save-the-promise:choice",
+                    "label": "【选项】把约定写进共同记忆",
+                    "effect": {
+                      "kind": "change-scene",
+                      "nextSceneSeed": "author-locked:world-model-anime-sunset:save-the-promise",
+                      "authoredTargetNodeId": "world-model-anime-sunset:save-the-promise"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "visitedBeatIds": [
+          "world-model-anime-sunset:after-video"
+        ],
+        "storyStateAfter": {
+          "logline": "她把耳边的碎发别好，夕阳落进眼睛里：“下次见面，你还会记得今天吗？”",
+          "genreTags": "世界模型 / 第一视角 / 互动视频 / 作者锁定",
+          "protagonist": "你以第一人称进入一段世界模型生成的影像，并在结尾决定故事下一步。",
+          "castNotes": "演示角色与动物仅用于本地作者锁定互动，不触发模型续写。",
+          "synopsis": "二次元第一视角相遇，在海边晚霞里把一次回应变成共同记忆。",
+          "openThreads": [
+            "她把耳边的碎发别好，夕阳落进眼睛里：“下次见面，你还会记得今天吗？”"
+          ],
+          "relationships": [],
+          "nextHook": "视频结束后，由玩家选择下一步。"
+        }
+      }
+    ],
+    "characters": [],
+    "storyState": {
+      "logline": "她把耳边的碎发别好，夕阳落进眼睛里：“下次见面，你还会记得今天吗？”",
+      "genreTags": "世界模型 / 第一视角 / 互动视频 / 作者锁定",
+      "protagonist": "你以第一人称进入一段世界模型生成的影像，并在结尾决定故事下一步。",
+      "castNotes": "演示角色与动物仅用于本地作者锁定互动，不触发模型续写。",
+      "synopsis": "二次元第一视角相遇，在海边晚霞里把一次回应变成共同记忆。",
+      "openThreads": [
+        "她把耳边的碎发别好，夕阳落进眼睛里：“下次见面，你还会记得今天吗？”"
+      ],
+      "relationships": [],
+      "nextHook": "视频结束后，由玩家选择下一步。"
+    },
+    "orientation": "landscape",
+    "language": "zh-CN",
+    "cacheIdentity": {
+      "visibility": "public",
+      "storyId": "case:world-model-anime-sunset",
+      "templateId": "world-model-anime-sunset",
+      "version": "world-model-demo-v1"
+    },
+    "authoredStory": {
+      "caseStudyId": "world-model-anime-sunset",
+      "version": "author-locked-world-model-demo-v1",
+      "authorLocked": true,
+      "releasePolicy": {
+        "defaultAccess": "public",
+        "restrictedNodeIds": []
+      },
+      "currentNodeId": "world-model-anime-sunset:start",
+      "currentBeatId": "world-model-anime-sunset:after-video",
+      "visitedNodeIds": [
+        "world-model-anime-sunset:start"
+      ],
+      "variables": {},
+      "variableDefinitions": [],
+      "nodes": [
+        {
+          "nodeId": "world-model-anime-sunset:start",
+          "sourceSceneId": "world-model-anime-sunset-video",
+          "title": "夕照下的约定",
+          "kind": "video",
+          "episodeId": "world-model-demo",
+          "sourceParagraphIds": [
+            "world-model-anime-sunset:video"
+          ],
+          "releasePolicy": "public",
+          "scene": {
+            "id": "world-model-anime-sunset:video",
+            "scenePrompt": "世界模型第一视角互动演示：夕照下的约定",
+            "entryBeatId": "world-model-anime-sunset:after-video",
+            "sceneKey": "world-model-anime-sunset",
+            "imageUrl": "/case-studies/world-model-anime-sunset/assets/poster.jpg",
+            "orientation": "landscape",
+            "media": {
+              "kind": "video",
+              "url": "/api/video-assets/world-model-demos/world-model-anime-sunset/content",
+              "posterUrl": "/case-studies/world-model-anime-sunset/assets/poster.jpg",
+              "durationMs": 78340,
+              "hasAudio": true,
+              "endBehavior": "unlock-interaction",
+              "allowSkip": true,
+              "hotspotsEnabled": false
+            },
+            "beats": [
+              {
+                "id": "world-model-anime-sunset:after-video",
+                "narration": "她把耳边的碎发别好，夕阳落进眼睛里：“下次见面，你还会记得今天吗？”",
+                "next": {
+                  "type": "choice",
+                  "choices": [
+                    {
+                      "id": "world-model-anime-sunset:walk-by-the-river:choice",
+                      "label": "【选项】约她沿河继续走",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "author-locked:world-model-anime-sunset:walk-by-the-river",
+                        "authoredTargetNodeId": "world-model-anime-sunset:walk-by-the-river"
+                      }
+                    },
+                    {
+                      "id": "world-model-anime-sunset:save-the-promise:choice",
+                      "label": "【选项】把约定写进共同记忆",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "author-locked:world-model-anime-sunset:save-the-promise",
+                        "authoredTargetNodeId": "world-model-anime-sunset:save-the-promise"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "nodeId": "world-model-anime-sunset:walk-by-the-river",
+          "sourceSceneId": "walk-by-the-river-ending",
+          "title": "约她沿河继续走",
+          "kind": "ending",
+          "episodeId": "world-model-demo",
+          "sourceParagraphIds": [
+            "world-model-anime-sunset:walk-by-the-river"
+          ],
+          "releasePolicy": "public",
+          "scene": {
+            "id": "world-model-anime-sunset:walk-by-the-river:scene",
+            "scenePrompt": "世界模型互动演示结尾：约她沿河继续走",
+            "entryBeatId": "world-model-anime-sunset:walk-by-the-river:beat",
+            "sceneKey": "world-model-anime-sunset-ending",
+            "imageUrl": "/case-studies/world-model-anime-sunset/assets/poster.jpg",
+            "orientation": "landscape",
+            "media": {
+              "kind": "image",
+              "url": "/case-studies/world-model-anime-sunset/assets/poster.jpg"
+            },
+            "beats": [
+              {
+                "id": "world-model-anime-sunset:walk-by-the-river:beat",
+                "narration": "你们沿着被晚霞染亮的河岸慢慢向前。她没有追问答案，只把脚步调成与你相同的节奏。",
+                "next": {
+                  "type": "choice",
+                  "choices": []
+                }
+              }
+            ]
+          }
+        },
+        {
+          "nodeId": "world-model-anime-sunset:save-the-promise",
+          "sourceSceneId": "save-the-promise-ending",
+          "title": "把约定写进共同记忆",
+          "kind": "ending",
+          "episodeId": "world-model-demo",
+          "sourceParagraphIds": [
+            "world-model-anime-sunset:save-the-promise"
+          ],
+          "releasePolicy": "public",
+          "scene": {
+            "id": "world-model-anime-sunset:save-the-promise:scene",
+            "scenePrompt": "世界模型互动演示结尾：把约定写进共同记忆",
+            "entryBeatId": "world-model-anime-sunset:save-the-promise:beat",
+            "sceneKey": "world-model-anime-sunset-ending",
+            "imageUrl": "/case-studies/world-model-anime-sunset/assets/poster.jpg",
+            "orientation": "landscape",
+            "media": {
+              "kind": "image",
+              "url": "/case-studies/world-model-anime-sunset/assets/poster.jpg"
+            },
+            "beats": [
+              {
+                "id": "world-model-anime-sunset:save-the-promise:beat",
+                "narration": "你把今天写进共同记忆。她确认保存成功后笑了：“那下一次，就从这里继续。”",
+                "next": {
+                  "type": "choice",
+                  "choices": []
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "assetSummary": {
+    "generated": 2,
+    "pending": 0,
+    "failed": 0
+  }
+}

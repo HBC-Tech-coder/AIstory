@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 1,
+  "kind": "aistory-authored-case",
+  "card": {
+    "id": "world-model-midnight-heartbeat",
+    "gender": "女性向",
+    "index": 0,
+    "title": "午夜心跳",
+    "outline": "女性向第一视角浪漫互动，把关系向前一步的决定留给玩家。",
+    "style": "世界模型生成 · 第一视角互动演示",
+    "tags": [
+      "世界模型生成",
+      "第一视角演示",
+      "作者锁定"
+    ],
+    "coverPath": "/case-studies/world-model-midnight-heartbeat/assets/poster.jpg",
+    "playPath": "/play?case=world-model-midnight-heartbeat",
+    "assetStatus": "ready",
+    "active": true
+  },
+  "session": {
+    "id": "case:world-model-midnight-heartbeat",
+    "createdAt": 1786320000000,
+    "worldSetting": "女性向第一视角浪漫互动，把关系向前一步的决定留给玩家。",
+    "styleGuide": "世界模型生成的第一视角视频，保持原片画面与声音。",
+    "history": [
+      {
+        "scene": {
+          "id": "world-model-midnight-heartbeat:video",
+          "scenePrompt": "世界模型第一视角互动演示：午夜心跳",
+          "entryBeatId": "world-model-midnight-heartbeat:after-video",
+          "sceneKey": "world-model-midnight-heartbeat",
+          "imageUrl": "/case-studies/world-model-midnight-heartbeat/assets/poster.jpg",
+          "orientation": "landscape",
+          "media": {
+            "kind": "video",
+            "url": "/api/video-assets/world-model-demos/world-model-midnight-heartbeat/content",
+            "posterUrl": "/case-studies/world-model-midnight-heartbeat/assets/poster.jpg",
+            "durationMs": 80320,
+            "hasAudio": true,
+            "endBehavior": "unlock-interaction",
+            "allowSkip": true,
+            "hotspotsEnabled": false
+          },
+          "beats": [
+            {
+              "id": "world-model-midnight-heartbeat:after-video",
+              "narration": "他握住你的手，却没有再靠近：“这一次，由你决定我们往哪里走。”",
+              "next": {
+                "type": "choice",
+                "choices": [
+                  {
+                    "id": "world-model-midnight-heartbeat:stay-and-listen:choice",
+                    "label": "【选项】留下听他说完",
+                    "effect": {
+                      "kind": "change-scene",
+                      "nextSceneSeed": "author-locked:world-model-midnight-heartbeat:stay-and-listen",
+                      "authoredTargetNodeId": "world-model-midnight-heartbeat:stay-and-listen"
+                    }
+                  },
+                  {
+                    "id": "world-model-midnight-heartbeat:go-to-window:choice",
+                    "label": "【选项】拉他去窗边看夜景",
+                    "effect": {
+                      "kind": "change-scene",
+                      "nextSceneSeed": "author-locked:world-model-midnight-heartbeat:go-to-window",
+                      "authoredTargetNodeId": "world-model-midnight-heartbeat:go-to-window"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "visitedBeatIds": [
+          "world-model-midnight-heartbeat:after-video"
+        ],
+        "storyStateAfter": {
+          "logline": "他握住你的手，却没有再靠近：“这一次，由你决定我们往哪里走。”",
+          "genreTags": "世界模型 / 第一视角 / 互动视频 / 作者锁定",
+          "protagonist": "你以第一人称进入一段世界模型生成的影像，并在结尾决定故事下一步。",
+          "castNotes": "演示角色与动物仅用于本地作者锁定互动，不触发模型续写。",
+          "synopsis": "女性向第一视角浪漫互动，把关系向前一步的决定留给玩家。",
+          "openThreads": [
+            "他握住你的手，却没有再靠近：“这一次，由你决定我们往哪里走。”"
+          ],
+          "relationships": [],
+          "nextHook": "视频结束后，由玩家选择下一步。"
+        }
+      }
+    ],
+    "characters": [],
+    "storyState": {
+      "logline": "他握住你的手，却没有再靠近：“这一次，由你决定我们往哪里走。”",
+      "genreTags": "世界模型 / 第一视角 / 互动视频 / 作者锁定",
+      "protagonist": "你以第一人称进入一段世界模型生成的影像，并在结尾决定故事下一步。",
+      "castNotes": "演示角色与动物仅用于本地作者锁定互动，不触发模型续写。",
+      "synopsis": "女性向第一视角浪漫互动，把关系向前一步的决定留给玩家。",
+      "openThreads": [
+        "他握住你的手，却没有再靠近：“这一次，由你决定我们往哪里走。”"
+      ],
+      "relationships": [],
+      "nextHook": "视频结束后，由玩家选择下一步。"
+    },
+    "orientation": "landscape",
+    "language": "zh-CN",
+    "cacheIdentity": {
+      "visibility": "public",
+      "storyId": "case:world-model-midnight-heartbeat",
+      "templateId": "world-model-midnight-heartbeat",
+      "version": "world-model-demo-v1"
+    },
+    "authoredStory": {
+      "caseStudyId": "world-model-midnight-heartbeat",
+      "version": "author-locked-world-model-demo-v1",
+      "authorLocked": true,
+      "releasePolicy": {
+        "defaultAccess": "public",
+        "restrictedNodeIds": []
+      },
+      "currentNodeId": "world-model-midnight-heartbeat:start",
+      "currentBeatId": "world-model-midnight-heartbeat:after-video",
+      "visitedNodeIds": [
+        "world-model-midnight-heartbeat:start"
+      ],
+      "variables": {},
+      "variableDefinitions": [],
+      "nodes": [
+        {
+          "nodeId": "world-model-midnight-heartbeat:start",
+          "sourceSceneId": "world-model-midnight-heartbeat-video",
+          "title": "午夜心跳",
+          "kind": "video",
+          "episodeId": "world-model-demo",
+          "sourceParagraphIds": [
+            "world-model-midnight-heartbeat:video"
+          ],
+          "releasePolicy": "public",
+          "scene": {
+            "id": "world-model-midnight-heartbeat:video",
+            "scenePrompt": "世界模型第一视角互动演示：午夜心跳",
+            "entryBeatId": "world-model-midnight-heartbeat:after-video",
+            "sceneKey": "world-model-midnight-heartbeat",
+            "imageUrl": "/case-studies/world-model-midnight-heartbeat/assets/poster.jpg",
+            "orientation": "landscape",
+            "media": {
+              "kind": "video",
+              "url": "/api/video-assets/world-model-demos/world-model-midnight-heartbeat/content",
+              "posterUrl": "/case-studies/world-model-midnight-heartbeat/assets/poster.jpg",
+              "durationMs": 80320,
+              "hasAudio": true,
+              "endBehavior": "unlock-interaction",
+              "allowSkip": true,
+              "hotspotsEnabled": false
+            },
+            "beats": [
+              {
+                "id": "world-model-midnight-heartbeat:after-video",
+                "narration": "他握住你的手，却没有再靠近：“这一次，由你决定我们往哪里走。”",
+                "next": {
+                  "type": "choice",
+                  "choices": [
+                    {
+                      "id": "world-model-midnight-heartbeat:stay-and-listen:choice",
+                      "label": "【选项】留下听他说完",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "author-locked:world-model-midnight-heartbeat:stay-and-listen",
+                        "authoredTargetNodeId": "world-model-midnight-heartbeat:stay-and-listen"
+                      }
+                    },
+                    {
+                      "id": "world-model-midnight-heartbeat:go-to-window:choice",
+                      "label": "【选项】拉他去窗边看夜景",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "author-locked:world-model-midnight-heartbeat:go-to-window",
+                        "authoredTargetNodeId": "world-model-midnight-heartbeat:go-to-window"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "nodeId": "world-model-midnight-heartbeat:stay-and-listen",
+          "sourceSceneId": "stay-and-listen-ending",
+          "title": "留下听他说完",
+          "kind": "ending",
+          "episodeId": "world-model-demo",
+          "sourceParagraphIds": [
+            "world-model-midnight-heartbeat:stay-and-listen"
+          ],
+          "releasePolicy": "public",
+          "scene": {
+            "id": "world-model-midnight-heartbeat:stay-and-listen:scene",
+            "scenePrompt": "世界模型互动演示结尾：留下听他说完",
+            "entryBeatId": "world-model-midnight-heartbeat:stay-and-listen:beat",
+            "sceneKey": "world-model-midnight-heartbeat-ending",
+            "imageUrl": "/case-studies/world-model-midnight-heartbeat/assets/poster.jpg",
+            "orientation": "landscape",
+            "media": {
+              "kind": "image",
+              "url": "/case-studies/world-model-midnight-heartbeat/assets/poster.jpg"
+            },
+            "beats": [
+              {
+                "id": "world-model-midnight-heartbeat:stay-and-listen:beat",
+                "narration": "你没有抽回手。他把准备了很久的话慢慢说完，窗外的夜色也变得安静。",
+                "next": {
+                  "type": "choice",
+                  "choices": []
+                }
+              }
+            ]
+          }
+        },
+        {
+          "nodeId": "world-model-midnight-heartbeat:go-to-window",
+          "sourceSceneId": "go-to-window-ending",
+          "title": "拉他去窗边看夜景",
+          "kind": "ending",
+          "episodeId": "world-model-demo",
+          "sourceParagraphIds": [
+            "world-model-midnight-heartbeat:go-to-window"
+          ],
+          "releasePolicy": "public",
+          "scene": {
+            "id": "world-model-midnight-heartbeat:go-to-window:scene",
+            "scenePrompt": "世界模型互动演示结尾：拉他去窗边看夜景",
+            "entryBeatId": "world-model-midnight-heartbeat:go-to-window:beat",
+            "sceneKey": "world-model-midnight-heartbeat-ending",
+            "imageUrl": "/case-studies/world-model-midnight-heartbeat/assets/poster.jpg",
+            "orientation": "landscape",
+            "media": {
+              "kind": "image",
+              "url": "/case-studies/world-model-midnight-heartbeat/assets/poster.jpg"
+            },
+            "beats": [
+              {
+                "id": "world-model-midnight-heartbeat:go-to-window:beat",
+                "narration": "你拉着他走到窗边。城市灯光铺在脚下，他笑着把剩下的话留给下一次见面。",
+                "next": {
+                  "type": "choice",
+                  "choices": []
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "assetSummary": {
+    "generated": 2,
+    "pending": 0,
+    "failed": 0
+  }
+}

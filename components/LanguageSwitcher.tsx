@@ -28,6 +28,7 @@ export function LanguageSwitcher({ className = "", variant = "full" }: LanguageS
   const currentShortName = SHORT_LOCALE_NAMES[locale] || locale;
 
   function switchTo(newLocale: Locale) {
+    if (pathname === null) return;
     const basePath = stripLocalePrefix(pathname);
     const newPath = localePath(basePath, newLocale);
     // Only persist to localStorage — do NOT update React state (setLocale)

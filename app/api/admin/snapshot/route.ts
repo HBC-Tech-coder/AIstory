@@ -8,7 +8,7 @@ import {
 export const runtime = "nodejs";
 
 export async function GET(): Promise<Response> {
-  const actor = await requireAdmin();
+  const actor = await requireAdmin(undefined, { allowIndependent: true });
   if (actor instanceof NextResponse) return actor;
   try {
     const repository = await getAdminRepositoryForActor(actor);

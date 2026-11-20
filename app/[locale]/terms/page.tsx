@@ -6,7 +6,7 @@ import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/config";
 
 export const metadata: Metadata = {
   title: "服务条款 — AIstory",
-  description: "AIstory 本地内测阶段的服务与使用规则。",
+  description: "AIstory 公开测试阶段的服务与使用规则。",
 };
 
 export default async function TermsPage({
@@ -32,7 +32,7 @@ export default async function TermsPage({
         服务条款
       </h1>
       <p className="mb-12 text-sm text-clay-500">
-        生效日期：2026 年 7 月 28 日 &nbsp;|&nbsp; 最后更新：2026 年 7 月 28 日
+        生效日期：2026 年 7 月 28 日 &nbsp;|&nbsp; 最后更新：2026 年 8 月 9 日
       </p>
 
       <div className="hairline-full mb-12 w-full" />
@@ -46,7 +46,7 @@ export default async function TermsPage({
             AIstory 提供互动影游、分支剧情、角色与世界线管理，以及文字、图片、视觉理解、配音、视频和本地创作工具等能力。不同能力可能处于已实现、局部实现、仅本地可用或待配置状态。
           </p>
           <p className="mt-3">
-            当前版本是本地内测和工程验证版本，不代表生产服务、正式运营主体、真实短信、充值支付或全部供应商连接已经上线。请以界面中的实际状态和调用提示为准。
+            当前版本是公开测试和工程验证版本。手机号短信验证与账户系统已经启用；充值支付、平台代付模型调用、全部供应商连接及正式商业运营仍未启用。请以界面中的实际状态和调用提示为准。
           </p>
         </section>
 
@@ -61,7 +61,7 @@ export default async function TermsPage({
             当某项操作即将触发平台代付的文字、图片、视觉理解、TTS 或视频调用且缓存未命中时，系统应先给出积分预估，再要求完成手机号验证。未登录、余额不足、定价未配置或安全检查未通过时，调用必须停止。
           </p>
           <p className="mt-3">
-            当前真实短信和生产身份系统尚未启用，本地测试登录不代表手机号账户已经可以在公开环境注册。
+            当前公开测试环境支持手机号验证码注册和登录，验证码由阿里云短信服务投递。未注册手机号验证成功后会创建账户；同一身份的首次注册赠送按版本化政策全局幂等执行，不会因重复登录再次赠送。
           </p>
         </section>
 
@@ -206,7 +206,7 @@ export default async function TermsPage({
       <div className="hairline-full mb-8 mt-16 w-full" />
 
       <footer className="pb-10 text-center text-[11px] text-clay-500">
-        <p>© 2026 AIstory · 本地内测说明</p>
+        <p>© 2026 AIstory · 公开测试说明</p>
         <p className="mt-2">
           <Link
             href={lp("/privacy")}

@@ -4,6 +4,10 @@ import type {
   LocalMiniDramaDrama,
   LocalMiniDramaProjectContext,
 } from "@/lib/localminidrama/types";
+import type {
+  CreatorStudioMediaKind,
+  CreatorStudioOpenModuleIntent,
+} from "@/lib/creator-studio/bridge";
 
 type ProjectContextState = "idle" | "loading" | "ready" | "empty" | "error";
 
@@ -14,6 +18,7 @@ type CreatorProjectContextPanelProps = {
   aistoryAssetCount: number;
   state: ProjectContextState;
   onSelect: (projectId: number) => void;
+  onOpenModule: (intent: CreatorStudioOpenModuleIntent) => void;
   onRefresh: () => void;
 };
 
@@ -45,18 +50,38 @@ export function CreatorProjectContextPanel({
   aistoryAssetCount,
   state,
   onSelect,
+  onOpenModule,
   onRefresh,
 }: CreatorProjectContextPanelProps) {
+  const openTasks = (taskId?: string) => {
+    if (!selectedProjectId) return;
+    onOpenModule(
+      taskId
+        ? { projectId: selectedProjectId, module: "tasks", taskId }
+        : { projectId: selectedProjectId, module: "tasks" },
+    );
+  };
+  const openMedia = (mediaKind: CreatorStudioMediaKind) => {
+    if (!selectedProjectId) return;
+    onOpenModule({ projectId: selectedProjectId, module: "media", mediaKind });
+  };
+  const openLocalAssets = () => {
+    if (!selectedProjectId) return;
+    onOpenModule({ projectId: selectedProjectId, module: "local-generation" });
+  };
+  const interactiveCountClass =
+    "ui-surface group min-w-0 border px-2 py-2 text-center transition hover:border-ember-500/40 hover:bg-cream-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-500 disabled:cursor-not-allowed disabled:opacity-50";
+
   return (
-    <section className="border-b border-[#6f4f2f]/15 bg-[#f8f3e9] px-4 py-3">
+    <section className="ui-surface-soft border-b px-4 py-3">
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex min-w-0 flex-1 items-center gap-2 text-xs text-[#6d5c48] sm:flex-none">
+        <label className="ui-copy flex min-w-0 flex-1 items-center gap-2 text-xs sm:flex-none">
           当前项目
           <select
             value={selectedProjectId ?? ""}
             onChange={(event) => onSelect(Number(event.target.value))}
             disabled={projects.length === 0}
-            className="h-9 min-w-0 flex-1 border border-[#6f4f2f]/25 bg-[#fffdf8] px-3 text-sm font-medium outline-none focus:border-[#8a5a2b] sm:w-60"
+            className="ui-input h-9 min-w-0 flex-1 border px-3 text-sm font-medium sm:w-60"
             aria-label="当前短剧项目"
           >
             {projects.length === 0 && <option value="">暂无项目</option>}
@@ -71,7 +96,7 @@ export function CreatorProjectContextPanel({
           type="button"
           onClick={onRefresh}
           disabled={!selectedProjectId || state === "loading"}
-          className="inline-flex h-9 items-center gap-2 border border-[#6f4f2f]/25 px-3 text-xs text-[#6d5134] hover:bg-white disabled:opacity-50"
+          className="ui-button-secondary inline-flex h-9 items-center gap-2 border px-3 text-xs"
         >
           <i
             className={`fa-solid fa-rotate ${state === "loading" ? "animate-spin" : ""}`}
@@ -79,14 +104,14 @@ export function CreatorProjectContextPanel({
           刷新项目
         </button>
         {context && (
-          <span className="text-xs text-[#7b6954]">
+          <span className="ui-muted text-xs">
             最近更新 {formatUpdatedAt(context.lastUpdatedAt)}
           </span>
         )}
       </div>
 
       {state === "empty" && (
-        <p className="mt-3 border border-dashed border-[#8a5a2b]/30 bg-white/45 px-3 py-2 text-sm text-[#756552]">
+        <p className="ui-surface ui-muted mt-3 border border-dashed px-3 py-2 text-sm">
           本地制作引擎中暂无项目；可先回到“AIstory 剧本台”创建草稿。
         </p>
       )}
@@ -100,7 +125,7 @@ export function CreatorProjectContextPanel({
           {Array.from({ length: 6 }).map((_, index) => (
             <div
               key={index}
-              className="h-14 animate-pulse border border-[#6f4f2f]/10 bg-white/55"
+              className="ui-surface h-14 animate-pulse border"
             />
           ))}
         </div>
@@ -108,34 +133,84 @@ export function CreatorProjectContextPanel({
       {context && (
         <>
           <div className="mt-3 grid grid-cols-3 gap-2 text-center sm:grid-cols-7">
-            {[
+            {([
               ["角色", context.counts.characters],
               ["场景", context.counts.scenes],
               ["道具", context.counts.props],
-              ["任务", context.counts.tasks],
-              ["图片", context.counts.images],
-              ["视频", context.counts.videos],
-              ["本地素材", aistoryAssetCount],
-            ].map(([label, value]) => (
+            ] as const).map(([label, value]) => (
               <div
-                key={String(label)}
-                className="border border-[#6f4f2f]/15 bg-white/60 px-2 py-2"
+                key={label}
+                className="ui-surface min-w-0 border px-2 py-2"
               >
-                <div className="text-lg font-semibold text-[#7b4e25]">
+                <div className="ui-primary text-lg font-semibold">
                   {value}
                 </div>
-                <div className="text-[11px] text-[#7b6954]">{label}</div>
+                <div className="ui-muted text-[11px]">{label}</div>
               </div>
             ))}
+            <button
+              type="button"
+              data-studio-context-target="tasks"
+              onClick={() => openTasks()}
+              disabled={!selectedProjectId}
+              className={interactiveCountClass}
+              aria-label={`打开任务模块，共 ${context.counts.tasks} 项`}
+            >
+              <div className="ui-primary text-lg font-semibold">
+                {context.counts.tasks}
+              </div>
+              <div className="ui-muted text-[11px]">任务</div>
+            </button>
+            <button
+              type="button"
+              data-studio-context-target="media"
+              data-studio-media-kind="image"
+              onClick={() => openMedia("image")}
+              disabled={!selectedProjectId}
+              className={interactiveCountClass}
+              aria-label={`打开图片媒体，共 ${context.counts.images} 项`}
+            >
+              <div className="ui-primary text-lg font-semibold">
+                {context.counts.images}
+              </div>
+              <div className="ui-muted text-[11px]">图片</div>
+            </button>
+            <button
+              type="button"
+              data-studio-context-target="media"
+              data-studio-media-kind="video"
+              onClick={() => openMedia("video")}
+              disabled={!selectedProjectId}
+              className={interactiveCountClass}
+              aria-label={`打开视频媒体，共 ${context.counts.videos} 项`}
+            >
+              <div className="ui-primary text-lg font-semibold">
+                {context.counts.videos}
+              </div>
+              <div className="ui-muted text-[11px]">视频</div>
+            </button>
+            <button
+              type="button"
+              data-studio-context-target="local-generation"
+              onClick={openLocalAssets}
+              disabled={!selectedProjectId}
+              className={interactiveCountClass}
+              aria-label={`打开本地素材模块，共 ${aistoryAssetCount} 项`}
+            >
+              <div className="ui-primary text-lg font-semibold">
+                {aistoryAssetCount}
+              </div>
+              <div className="ui-muted text-[11px]">本地素材</div>
+            </button>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-            <span className="font-semibold text-[#6d5134]">
+            <span className="font-semibold text-clay-700">
               {context.project.title}
             </span>
-            <span className="border border-[#6f4f2f]/15 px-2 py-1 text-[#756552]">
+            <span className="ui-muted ui-border border px-2 py-1">
               {context.project.status}
             </span>
-            <span className="text-[#7b6954]">
+            <span className="ui-muted">
               {context.project.episodeCount} 集
             </span>
             {context.state === "partial" && (
@@ -144,13 +219,18 @@ export function CreatorProjectContextPanel({
               </span>
             )}
             {context.activeTasks.slice(0, 4).map((task) => (
-              <span
+              <button
                 key={task.id}
-                className="border border-[#6f4f2f]/15 bg-white/55 px-2 py-1 text-[#6d5c48]"
+                type="button"
+                data-studio-context-target="tasks"
+                data-studio-active-task={task.id}
+                onClick={() => openTasks(task.id)}
+                className="ui-button-secondary min-w-0 max-w-full border px-2 py-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-500"
                 title={`${task.type} · ${task.progress}%`}
+                aria-label={`打开任务模块：${task.type}，${TASK_STATUS_LABEL[task.status] ?? task.status}，进度 ${task.progress}%`}
               >
                 {TASK_STATUS_LABEL[task.status] ?? task.status} {task.progress}%
-              </span>
+              </button>
             ))}
           </div>
         </>

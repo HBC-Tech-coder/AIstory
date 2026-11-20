@@ -16,6 +16,7 @@ import {
   type LoadingProgress,
   type Phase,
 } from "@/components/PlayCanvas";
+import type { VideoStoryCompletion } from "@/components/VideoStoryPlayer";
 import type { DialogueHistoryItem } from "@/components/DialogueHistoryModal";
 import {
   StyleSwitcherDrawer,
@@ -44,6 +45,11 @@ import {
   parseStoryShareDoc,
   storyShareFilename,
 } from "@/lib/storyShare";
+import {
+  STORY_IMPORT_RECOVERY_COPY,
+  readStoryImportDoc,
+  type StoryImportIssue,
+} from "@/lib/storyImportRecovery";
 import { provisionVoice, synthesize } from "@infiplot/tts-client";
 import {
   startSession,
@@ -55,6 +61,7 @@ import {
   cancelSpeculativeBranch,
   applyStyleHotSwap,
   AuthRequiredError,
+  isPlatformGenerationUnavailable,
 } from "@/lib/engineClient";
 import {
   DEFAULT_BRANCH_PREFETCH_BUDGET,
@@ -96,6 +103,10 @@ import { track } from "@/lib/analytics";
 import { AUTH_ENABLED } from "@/lib/supabase/config";
 import { consumeResumeSnapshot } from "@/lib/authResume";
 import {
+  playIssueRecoveryCopy,
+  readCustomPlayDraft,
+} from "@/lib/playIssueRecovery";
+import {
   AuthModal,
   type AuthRequirement,
 } from "@/components/AuthModal";
@@ -108,19 +119,53 @@ import {
   withCharacterIdentity,
 } from "@/lib/character-names";
 import {
+  coerceSceneMedia,
+  sceneHasRenderableMedia,
+  scenePosterUrl,
+  sceneUsesEmbeddedAudio,
+  videoAllowsSceneInteraction,
+} from "@/lib/sceneMedia";
+import {
   matchVoiceProfile,
   voiceDescriptionFromProfile,
 } from "@/lib/voiceProfiles";
+import { SteamCompletionCta } from "@/components/SteamCompletionCta";
+import { SteamDesktopBridge } from "@/components/SteamDesktopBridge";
+import { shouldShowSteamCompletionCta } from "@/lib/steam/contracts";
+import { SharedStoryPublishPanel } from "@/components/SharedStoryPublishPanel";
 import {
   findAuthoredNode,
   isAuthoredAiContinuationAllowed,
   transitionAuthoredStorySession,
   type CaseStudyPublishedBundle,
 } from "@/lib/case-studies/schema";
+import { isAuthoredChoiceAvailable } from "@/lib/video-stories/runtime";
+import {
+  buildPlayEndOfDemoNotice,
+  buildPlayFirstLoadErrorCopy,
+  buildPlaySceneErrorCopy,
+  detectPlayTerminal,
+  PLAY_FIRST_LOAD_DEMO_LABEL,
+  PLAY_FIRST_LOAD_SETTINGS_LABEL,
+  resolveSafeReturn,
+  STORY_ARCHIVE_EMPTY,
+  STORY_ARCHIVE_EXPORT_DONE,
+  STORY_ARCHIVE_EXPORT_LABEL,
+  STORY_ARCHIVE_EXPORT_TITLE,
+  STORY_ARCHIVE_PACKING,
+} from "@/lib/playerReviewPolicy";
+
+// Author-locked scenes may stay interactive only at their authored boundary.
+// Keep this meaning in one place so UI gating and request guards cannot drift.
+function isAuthorLockedScene(session: Session | null | undefined): boolean {
+  const runtime = session?.authoredStory;
+  return Boolean(
+    runtime?.authorLocked && !isAuthoredAiContinuationAllowed(runtime),
+  );
+}
 
 async function requestScene(request: SceneRequest): Promise<SceneResponse> {
-  const runtime = request.session.authoredStory;
-  if (runtime?.authorLocked && !isAuthoredAiContinuationAllowed(runtime)) {
+  if (isAuthorLockedScene(request.session)) {
     throw new Error("作者锁定章节尚未到达 AI 续写边界");
   }
   return requestSceneUnsafe(request);
@@ -138,15 +183,14 @@ type PendingResumeAction =
   | { kind: "background-click"; x: number; y: number };
 
 // Shape written to sessionStorage[PLAY_RESUME_KEY]. `imageOriginalUrl` is the
-// remote CDN URL (never the blob: URL — those are revoked on unmount and won't
-// survive the full-page reload); restorePlayResume re-resolves it to a fresh
-// blob via getOrCreateBlobUrl.
+// legacy remote poster URL (never a blob: URL). Video-only scenes may omit it;
+// restorePlayResume then waits for video metadata instead of image decode.
 type PlayResumeSnapshot = {
   session: Session;
   beatId: string;
   visitedBeats: string[];
   orientation: Orientation;
-  imageOriginalUrl: string;
+  imageOriginalUrl?: string;
   pendingAction?: PendingResumeAction;
 };
 
@@ -912,8 +956,8 @@ function saveSelectedRole(role: PlayableRole) {
 
 function RoleToast({ message }: { message: string }) {
   return (
-    <div className="fixed left-1/2 top-4 z-[80] -translate-x-1/2 rounded-full border border-amber-300/25 bg-black/78 px-4 py-2 text-[12px] text-cream-50 shadow-lg backdrop-blur-sm">
-      <i className="fa-solid fa-user-check mr-2 text-amber-300" />
+    <div className="fixed left-1/2 top-4 z-[80] -translate-x-1/2 rounded-full border border-blue-300/25 bg-black/78 px-4 py-2 text-[12px] text-cream-50 shadow-lg backdrop-blur-sm">
+      <i className="fa-solid fa-user-check mr-2 text-blue-300" />
       {message}
     </div>
   );
@@ -921,8 +965,8 @@ function RoleToast({ message }: { message: string }) {
 
 function PlayNoticeToast({ message }: { message: string }) {
   return (
-    <div className="fixed left-1/2 top-16 z-[85] -translate-x-1/2 rounded-full border border-amber-300/25 bg-black/78 px-4 py-2 text-[12px] text-cream-50 shadow-lg backdrop-blur-sm">
-      <i className="fa-solid fa-circle-info mr-2 text-amber-300" />
+    <div className="fixed left-1/2 top-16 z-[85] -translate-x-1/2 rounded-full border border-blue-300/25 bg-black/78 px-4 py-2 text-[12px] text-cream-50 shadow-lg backdrop-blur-sm">
+      <i className="fa-solid fa-circle-info mr-2 text-blue-300" />
       {message}
     </div>
   );
@@ -992,17 +1036,17 @@ function CharacterPickerModal({
       key={role.id}
       type="button"
       onClick={() => chooseRole(role)}
-      className="group w-full border border-clay-900/12 bg-cream-50/85 p-4 text-left transition-colors hover:border-amber-700/55 hover:bg-cream-100"
+      className="group w-full border border-clay-900/12 bg-cream-50/85 p-4 text-left transition-colors hover:border-ember-500/55 hover:bg-cream-100"
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-800/80">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ember-500/80">
             {role.source === "hot" ? "热播角色" : "我的角色"}
           </p>
           <h3 className="mt-2 text-xl font-semibold text-clay-900">{role.name}</h3>
           <p className="mt-1 text-sm text-clay-500">{role.role}</p>
         </div>
-        <span className="flex h-10 w-10 items-center justify-center border border-clay-900/12 text-amber-800 transition-colors group-hover:border-amber-700/55">
+        <span className="flex h-10 w-10 items-center justify-center border border-clay-900/12 text-ember-500 transition-colors group-hover:border-ember-500/55">
           <i className="fa-solid fa-user-plus text-[13px]" />
         </span>
       </div>
@@ -1026,7 +1070,7 @@ function CharacterPickerModal({
       <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden border border-clay-900/18 bg-cream-50 shadow-2xl">
         <div className="flex items-center justify-between border-b border-clay-900/10 px-5 py-4 md:px-6">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-800/75">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ember-500/75">
               Playable Character
             </p>
             <h2 className="mt-1 text-2xl font-semibold text-clay-900">选择或创建角色</h2>
@@ -1034,7 +1078,7 @@ function CharacterPickerModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center border border-clay-900/12 text-clay-500 transition-colors hover:border-amber-700/50 hover:text-amber-800"
+            className="flex h-10 w-10 items-center justify-center border border-clay-900/12 text-clay-500 transition-colors hover:border-ember-500/50 hover:text-ember-500"
             aria-label="关闭角色面板"
             title="关闭"
           >
@@ -1055,8 +1099,8 @@ function CharacterPickerModal({
                 onClick={() => setTab(key as "hot" | "mine" | "create")}
                 className={`mb-3 w-full border px-4 py-3 text-left transition-colors ${
                   tab === key
-                    ? "border-amber-700/55 bg-cream-50 text-amber-900"
-                    : "border-clay-900/10 text-clay-600 hover:border-amber-700/35"
+                    ? "border-ember-500/55 bg-cream-50 text-ember-500"
+                    : "border-clay-900/10 text-clay-600 hover:border-ember-500/35"
                 }`}
               >
                 <span className="block text-sm font-semibold">{label}</span>
@@ -1079,7 +1123,7 @@ function CharacterPickerModal({
                 </div>
               ) : (
                 <div className="flex min-h-[360px] flex-col items-center justify-center border border-dashed border-clay-900/16 text-center">
-                  <i className="fa-solid fa-user-pen text-3xl text-amber-800/65" />
+                  <i className="fa-solid fa-user-pen text-3xl text-ember-500/65" />
                   <h3 className="mt-5 text-xl font-semibold text-clay-900">还没有自定义角色</h3>
                   <p className="mt-2 max-w-md text-sm leading-6 text-clay-500">
                     新用户默认只展示热门角色。创建第一个角色后，它会保存在本机，并可进入后续剧情测试。
@@ -1087,7 +1131,7 @@ function CharacterPickerModal({
                   <button
                     type="button"
                     onClick={() => setTab("create")}
-                    className="mt-6 border border-amber-700/45 bg-amber-700 px-5 py-3 text-sm font-semibold text-cream-50"
+                    className="mt-6 border border-ember-500 bg-ember-500 px-5 py-3 text-sm font-semibold text-white"
                   >
                     创建我的角色
                   </button>
@@ -1104,7 +1148,7 @@ function CharacterPickerModal({
                       value={form.name}
                       onChange={(e) => setForm((value) => ({ ...value, name: e.target.value }))}
                       placeholder="例如：林穗、阿梨、你自己的名字"
-                      className="mt-2 w-full border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-amber-700/55"
+                      className="mt-2 w-full border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-ember-500/55"
                     />
                   </label>
                   <label className="block">
@@ -1113,7 +1157,7 @@ function CharacterPickerModal({
                       value={form.role}
                       onChange={(e) => setForm((value) => ({ ...value, role: e.target.value }))}
                       placeholder="例如：旧案记者、青梅竹马、边境城黑客"
-                      className="mt-2 w-full border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-amber-700/55"
+                      className="mt-2 w-full border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-ember-500/55"
                     />
                   </label>
                   <label className="block">
@@ -1123,7 +1167,7 @@ function CharacterPickerModal({
                       onChange={(e) => setForm((value) => ({ ...value, description: e.target.value }))}
                       placeholder="写一点性格、关系、禁忌、要参与的剧情方向。"
                       rows={5}
-                      className="mt-2 w-full resize-none border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-amber-700/55"
+                      className="mt-2 w-full resize-none border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-ember-500/55"
                     />
                   </label>
                   <div className="grid gap-4 md:grid-cols-2">
@@ -1132,7 +1176,7 @@ function CharacterPickerModal({
                       <select
                         value={form.visualStyle}
                         onChange={(e) => setForm((value) => ({ ...value, visualStyle: e.target.value }))}
-                        className="mt-2 w-full border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-amber-700/55"
+                        className="mt-2 w-full border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-ember-500/55"
                       >
                         <option>电影感水彩</option>
                         <option>日系动画</option>
@@ -1146,7 +1190,7 @@ function CharacterPickerModal({
                       <select
                         value={form.voice}
                         onChange={(e) => setForm((value) => ({ ...value, voice: e.target.value }))}
-                        className="mt-2 w-full border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-amber-700/55"
+                        className="mt-2 w-full border border-clay-900/12 bg-cream-50 px-4 py-3 text-clay-900 outline-none transition-colors focus:border-ember-500/55"
                       >
                         <option>清亮自然</option>
                         <option>低声克制</option>
@@ -1160,7 +1204,7 @@ function CharacterPickerModal({
                     type="button"
                     onClick={createRole}
                     disabled={!form.name.trim()}
-                    className="border border-amber-700 bg-amber-700 px-6 py-3 font-semibold text-cream-50 transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
+                    className="border border-ember-500 bg-ember-500 px-6 py-3 font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     保存并进入当前剧情
                   </button>
@@ -1188,6 +1232,16 @@ function PlayInner() {
   const params = useSearchParams();
   const { t, locale } = useI18n();
   const lp = useLocalePath();
+  const steamChannel = params?.get("channel") === "steam";
+  // Only the exact allowlisted `/mobile` return target is honored; every other
+  // value (including absolute/protocol-relative URLs) falls back to home. The
+  // hrefs are built by lp(), so the result stays locale-aware and can never be
+  // an open redirect.
+  const safeReturn = resolveSafeReturn({
+    returnTo: params?.get("returnTo"),
+    homeHref: lp("/"),
+    mobileHref: lp("/mobile"),
+  });
 
   const [phase, setPhase] = useState<Phase>("loading-first");
   const [firstFrameProgress, setFirstFrameProgress] = useState<LoadingProgress>(
@@ -1197,6 +1251,9 @@ function PlayInner() {
   const [currentScene, setCurrentScene] = useState<Scene | null>(null);
   const [currentBeatId, setCurrentBeatId] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [videoInteractionKey, setVideoInteractionKey] = useState<string | null>(
+    null,
+  );
   const [beatAudioMap, setBeatAudioMap] = useState<Record<string, string>>({});
   // Lazy-initialize 优先级：本局选择(homepage 的「语音配音」存到 sessionStorage:infiplot:custom)
   // > 上次会话的粘性偏好(localStorage:infiplot:muted) > 默认非静音。
@@ -1222,6 +1279,19 @@ function PlayInner() {
     y: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // custom=1 reads a tab-local sessionStorage draft. Missing/corrupt drafts are
+  // recoverable (the user can return home and re-edit); they must not be
+  // silently redirected away from the play URL.
+  const [customDraftIssue, setCustomDraftIssue] = useState<
+    "missing" | "malformed" | null
+  >(null);
+  // ?share=1 replays a story file imported in THIS tab. A new tab / reopened
+  // browser may lack the sessionStorage copy (opener cloning and session restore
+  // can preserve it). That is a recoverable import problem
+  // and must never fall through to the generic provider/model/key error.
+  const [importIssue, setImportIssue] = useState<StoryImportIssue | null>(null);
+  const [platformGenerationUnavailable, setPlatformGenerationUnavailable] =
+    useState(false);
   const [presentation, setPresentation] = useState(false);
   // Session-locked image orientation (see detectOrientation). "portrait" makes
   // the whole play surface render full-bleed vertical on phones.
@@ -1247,6 +1317,13 @@ function PlayInner() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authRequirement, setAuthRequirement] =
     useState<AuthRequirement | undefined>();
+  // First-load auth is different from an in-scene 401: there is no action
+  // closure to replay, and the loading canvas must not pretend to be at 100%.
+  // While this is set the page renders an explicit paused recovery screen and
+  // leaves the tab-local draft untouched.
+  const [firstLoadAuthRequirement, setFirstLoadAuthRequirement] =
+    useState<AuthRequirement | null>(null);
+  const firstLoadAuthRequirementRef = useRef<AuthRequirement | null>(null);
   const authResolveRef = useRef<(() => void) | null>(null);
   // Serializable description of the action that hit the 401 (choice / freeform
   // text / background-click coords), captured alongside the retry closure. An
@@ -1318,6 +1395,58 @@ function PlayInner() {
     [],
   );
 
+  // First-load 401: pause instead of claiming 100% error progress. There is no
+  // serializable action to replay yet, so AuthModal success re-runs the
+  // bootstrap effect once (instead of retrying a scene call).
+  const markFirstLoadAuthRequired = useCallback(
+    (e: AuthRequiredError) => {
+      const requirement: AuthRequirement = {
+        message: e.message,
+        quote: e.quote,
+      };
+      firstLoadAuthRequirementRef.current = requirement;
+      setFirstLoadAuthRequirement(requirement);
+      authResolveRef.current = null;
+      pendingResumeActionRef.current = null;
+      setError(null);
+      setPlatformGenerationUnavailable(false);
+      handleAuthError(e);
+    },
+    [handleAuthError],
+  );
+
+  const closeAuthModal = useCallback(() => {
+    setAuthModalOpen(false);
+    setAuthRequirement(undefined);
+    // User dismissed login — drop the retry, don't re-run the action. A
+    // first-load pause stays on screen so login can be reopened explicitly.
+    authResolveRef.current = null;
+    pendingResumeActionRef.current = null;
+  }, []);
+
+  const completeAuthModal = useCallback(() => {
+    setAuthModalOpen(false);
+    setAuthRequirement(undefined);
+    if (firstLoadAuthRequirementRef.current) {
+      firstLoadAuthRequirementRef.current = null;
+      setFirstLoadAuthRequirement(null);
+      authResolveRef.current = null;
+      pendingResumeActionRef.current = null;
+      setError(null);
+      setPlatformGenerationUnavailable(false);
+      // Relinquish the bootstrap slot before re-running it. The increment is
+      // the existing retryBootstrap trigger; clearing the ref first guarantees
+      // this can happen at most once per successful first-load sign-in.
+      startedRef.current = false;
+      setRetryBootstrap((n) => n + 1);
+      return;
+    }
+    const retry = authResolveRef.current;
+    authResolveRef.current = null;
+    pendingResumeActionRef.current = null;
+    retry?.();
+  }, []);
+
   useEffect(() => {
     if (!roleNotice) return;
     const timer = window.setTimeout(() => setRoleNotice(null), 3200);
@@ -1364,13 +1493,14 @@ function PlayInner() {
 
       setOrientation(snap.orientation);
       visitedBeatsRef.current = [...snap.visitedBeats];
-      lastImageOriginalUrlRef.current = snap.imageOriginalUrl;
+      const poster = snap.imageOriginalUrl || scenePosterUrl(last.scene);
+      lastImageOriginalUrlRef.current = poster ?? null;
 
       setSession(snap.session);
       setCurrentScene(last.scene);
       setCurrentBeatId(snap.beatId);
 
-      const blobUrl = await getOrCreateBlobUrl(snap.imageOriginalUrl);
+      const blobUrl = poster ? await getOrCreateBlobUrl(poster) : null;
       const ready = waitForImageReady();
       setImageUrl(blobUrl);
       await ready;
@@ -1466,6 +1596,119 @@ function PlayInner() {
     if (!currentScene || !currentBeatId) return null;
     return currentScene.beats.find((b) => b.id === currentBeatId) ?? null;
   }, [currentScene, currentBeatId]);
+
+  const currentSceneMedia = useMemo(
+    () =>
+      currentScene
+        ? coerceSceneMedia(currentScene)
+        : ({ kind: "image" } as const),
+    [currentScene],
+  );
+  const currentVideoKey = currentScene
+    ? `${session?.timeline?.activeBranchId || "main"}:${session?.history.length || 0}:${currentScene.id}`
+    : null;
+  const videoInteractionUnlocked =
+    currentSceneMedia.kind !== "video" ||
+    (currentVideoKey !== null && videoInteractionKey === currentVideoKey);
+  const currentAuthoredNode = session?.authoredStory
+    ? findAuthoredNode(
+        session.authoredStory,
+        session.authoredStory.currentNodeId,
+      )
+    : undefined;
+  const showSteamCompletion = shouldShowSteamCompletionCta({
+    channel: steamChannel ? "steam" : null,
+    authoredNodeKind: currentAuthoredNode?.kind,
+    mediaKind: currentSceneMedia.kind,
+    videoInteractionUnlocked,
+  });
+
+  // ── Honest end-of-demo / preserved-canvas error state ────────────────
+  // An authored terminal beat (or a dangling continue) has no forward path.
+  // Rather than looking stuck, surface an explicit notice. Detection is
+  // conservative and NEVER generates content or relaxes author locks.
+  const hasPreservedCanvas = Boolean(
+    session && currentScene && (imageUrl || sceneHasRenderableMedia(currentScene)),
+  );
+  const terminalReason =
+    phase === "ready" &&
+    !error &&
+    // Never cover an authored video while it is still playing: the terminal
+    // notice waits until the player has finished the video and interaction is
+    // unlocked (image scenes have no such gate).
+    (currentSceneMedia.kind !== "video" || videoInteractionUnlocked)
+      ? detectPlayTerminal({
+          scene: currentScene,
+          beat: currentBeat,
+          currentBeatId,
+          authoredNodeKind: currentAuthoredNode?.kind,
+          authoredLocked: isAuthorLockedScene(session),
+        })
+      : null;
+  const endOfDemoNotice = terminalReason
+    ? buildPlayEndOfDemoNotice(terminalReason, safeReturn)
+    : null;
+  const handleReplayEndOfDemo = useCallback(() => {
+    if (!currentScene) return;
+    const firstBeat = currentScene.entryBeatId;
+    setCurrentBeatId(firstBeat);
+    visitedBeatsRef.current = [firstBeat];
+    setError(null);
+  }, [currentScene]);
+
+  const canvasErrorCopy = buildPlaySceneErrorCopy(safeReturn);
+  const firstLoadErrorCopy = buildPlayFirstLoadErrorCopy(safeReturn);
+  // With a valid canvas still on screen, a failed step must not replace the
+  // whole page with a raw backend error. Keep the scene and show fixed,
+  // dismissible Chinese copy with a safe way out.
+  const canvasErrorBanner =
+    error && hasPreservedCanvas ? (
+      <div
+        className="fixed inset-x-0 top-0 z-[74] px-3 pt-3"
+        role="alert"
+        data-play-canvas-error
+      >
+        <div className="mx-auto max-w-xl rounded-xl border border-ember-500/55 bg-black/90 px-4 py-3 text-left shadow-2xl backdrop-blur">
+          <div className="flex items-start gap-3">
+            <i className="fa-solid fa-circle-exclamation mt-0.5 text-ember-400" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[12px] font-semibold text-cream-50">
+                {canvasErrorCopy.title}
+              </p>
+              <p className="mt-1 text-[11px] leading-5 text-cream-50/80">
+                {canvasErrorCopy.body}
+              </p>
+              <p className="mt-1 text-[10px] leading-5 text-cream-50/60">
+                {canvasErrorCopy.safetyNote}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  className="min-h-8 rounded-lg border border-blue-300/50 px-3 text-[11px] font-semibold text-blue-100 transition-colors hover:border-blue-300/80"
+                >
+                  {canvasErrorCopy.dismissLabel}
+                </button>
+                <a
+                  href={safeReturn.href}
+                  className="min-h-8 rounded-lg border border-cream-50/25 px-3 text-[11px] font-semibold leading-8 text-cream-50/85 transition-colors hover:text-cream-50"
+                >
+                  {canvasErrorCopy.backLabel}
+                </a>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-cream-50/60 transition-colors hover:text-cream-50"
+              aria-label="关闭错误提示"
+            >
+              <i className="fa-solid fa-xmark text-[13px]" />
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null;
 
   const dialogueHistory = useMemo<DialogueHistoryItem[]>(
     () => buildDialogueHistory(session),
@@ -1665,6 +1908,7 @@ function PlayInner() {
       beat: { id: string; speaker?: string; line?: string; lineDelivery?: string },
     ): Promise<void> => {
       if (mutedRef.current) return; // 静音 → 不合成 TTS（避免无谓的调用与花费）。
+      if (sceneUsesEmbeddedAudio(currentSceneRef.current)) return;
       // 「首页选关闭」也走这条路：bootstrap 时 muted 已被初始化为 true。
       if (!beat.speaker || !beat.line) return;
       const speechLine = renderPersonalizedText(
@@ -1851,6 +2095,7 @@ function PlayInner() {
     const scene = currentSceneRef.current;
     const sess = sessionRef.current;
     if (!scene || !sess) return;
+    if (sceneUsesEmbeddedAudio(scene)) return;
     for (const b of scene.beats) {
       if (b.speaker && b.line) void fetchBeatAudio(sess, b);
     }
@@ -2170,14 +2415,14 @@ function PlayInner() {
   const handleExportStory = useCallback(async () => {
     const s = sessionRef.current;
     if (!s || s.history.length === 0) {
-      showPlayNotice("暂无可分享的剧情");
+      showPlayNotice(STORY_ARCHIVE_EMPTY);
       return;
     }
     if (exportingStoryRef.current) {
-      showPlayNotice("故事正在打包中");
+      showPlayNotice("剧情存档正在打包中");
       return;
     }
-    showPlayNotice("正在打包故事分享文件...");
+    showPlayNotice(STORY_ARCHIVE_PACKING);
     exportingStoryRef.current = true;
     const sceneIndex = Math.max(0, s.history.length - 1);
 
@@ -2230,7 +2475,7 @@ function PlayInner() {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
-      showPlayNotice("故事分享文件已生成");
+      showPlayNotice(STORY_ARCHIVE_EXPORT_DONE);
     } catch {
       showPlayNotice(t("play.shareErrors.packFailed"));
     } finally {
@@ -2296,14 +2541,25 @@ function PlayInner() {
 
   // ── Bootstrap: start session ─────────────────────────────────────────
   useEffect(() => {
+    if (!params) return;
     if (startedRef.current) return;
     startedRef.current = true;
 
     // Consume a legacy OAuth snapshot when one remains from an older build.
-    if (
-      AUTH_ENABLED &&
-      sessionStorage.getItem(PLAY_RESUME_KEY) !== null
-    ) {
+    // Only this existence probe is guarded: reading sessionStorage can throw in
+    // privacy-restricted tabs, and an unguarded throw here would abort the
+    // bootstrap before the custom-draft recovery screen can render. The consume
+    // path below keeps its existing behaviour untouched.
+    let hasLegacyResumeSnapshot = false;
+    if (AUTH_ENABLED) {
+      try {
+        hasLegacyResumeSnapshot =
+          sessionStorage.getItem(PLAY_RESUME_KEY) !== null;
+      } catch {
+        hasLegacyResumeSnapshot = false;
+      }
+    }
+    if (hasLegacyResumeSnapshot) {
       void (async () => {
         const snap = await consumeResumeSnapshot<PlayResumeSnapshot>(
           PLAY_RESUME_KEY,
@@ -2336,8 +2592,10 @@ function PlayInner() {
     //   ?share=1             → 首页上传的剧情分享 JSON，从第一幕开始本地回放
     //   ?storyId=<uuid>      → 加载已保存的剧情（从 localStorage）
     //   ?case=<case-id>      → 加载本地原创案例的确定性 authored graph
+    //   ?videoStory=<id>     → 加载已发布的内容寻址互动视频 authored graph
     const cardName = params.get("card");
     const caseStudyId = params.get("case");
+    const videoStoryId = params.get("videoStory");
     const presetId = params.get("preset");
     const isCustom = params.get("custom") === "1";
     const isShare = params.get("share") === "1";
@@ -2347,23 +2605,43 @@ function PlayInner() {
     if (isShare) {
       (async () => {
         const t0 = Date.now();
-        try {
-          const raw = sessionStorage.getItem(STORY_SHARE_STORAGE_KEY);
-          if (!raw) throw new Error(t("play.shareErrors.notFound"));
-          const doc = parseStoryShareDoc(JSON.parse(raw));
-          const imported = doc.session;
-          const first = imported.history[0];
-          if (!first) throw new Error(t("play.shareErrors.invalid"));
-          if (!first.scene.imageUrl) throw new Error(t("play.shareErrors.noImage"));
+        // Reset the import classification on every legitimate (re)bootstrap so
+        // a retried bootstrap re-derives the current tab's state.
+        setImportIssue(null);
+        // Classify the tab-local import BEFORE any image-loading request. A
+        // missing/corrupt/unreadable import is a dedicated recovery state, not
+        // a generation failure — nothing below may throw it into the generic
+        // first-load error screen.
+        const importRead = readStoryImportDoc(
+          () => sessionStorage,
+          STORY_SHARE_STORAGE_KEY,
+          (raw) => parseStoryShareDoc(JSON.parse(raw)),
+        );
+        if (importRead.status !== "ok") {
+          setImportIssue(importRead.status);
+          return;
+        }
+        const doc = importRead.doc;
+        const imported = doc.session;
+        const first = imported.history[0];
+        const initialStoryState = first?.storyStateAfter ?? imported.storyState;
+        // Everything the synchronous replay setup needs is validated here so a
+        // structurally usable but unplayable document is reported as a
+        // malformed import instead of failing mid-playback.
+        if (!first || !sceneHasRenderableMedia(first.scene) || !initialStoryState) {
+          setImportIssue("malformed");
+          return;
+        }
 
+        try {
           const sessionOrientation =
             first.scene.orientation ?? imported.orientation ?? detectOrientation();
           setOrientation(sessionOrientation);
-          const blobUrl = await getOrCreateBlobUrl(first.scene.imageUrl);
-          lastImageOriginalUrlRef.current = first.scene.imageUrl;
-
-          const initialStoryState = first.storyStateAfter ?? imported.storyState;
-          if (!initialStoryState) throw new Error(t("play.shareErrors.noMemory"));
+          const firstPoster = scenePosterUrl(first.scene);
+          const blobUrl = firstPoster
+            ? await getOrCreateBlobUrl(firstPoster)
+            : null;
+          lastImageOriginalUrlRef.current = firstPoster ?? null;
 
           const initial: Session = {
             ...imported,
@@ -2425,34 +2703,49 @@ function PlayInner() {
       playerName?: string;
       language?: string;
     } | null = null;
+    // custom=1 is the only entry path backed by a tab-local sessionStorage
+    // draft. A missing/corrupt payload is recoverable and must NOT silently
+    // redirect away from /play or reuse story text from the URL.
+    let customDraftFailure: "missing" | "malformed" | null = null;
     if (!cardName) {
       if (presetId) {
         const p = PRESETS.find((x) => x.id === presetId);
         if (p) livePayload = { worldSetting: p.worldSetting, styleGuide: p.styleGuide, playerName: readStoredPlayerName() || undefined, language: locale };
-      } else if (isCustom) {
-        const stored = sessionStorage.getItem("infiplot:custom");
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored) as {
-              worldSetting: string;
-              styleGuide: string;
-              audioEnabled?: boolean;
-              styleReferenceImage?: string;
-              playerName?: string;
-            };
-            livePayload = {
-              worldSetting: parsed.worldSetting,
-              styleGuide: parsed.styleGuide,
-              styleReferenceImage: parsed.styleReferenceImage || undefined,
-              playerName: parsed.playerName || undefined,
-              language: locale,
-            };
-            liveAudioEnabled = parsed.audioEnabled === true;
-          } catch {
-            livePayload = null;
-          }
+      }
+      if (
+        !livePayload &&
+        isCustom &&
+        !caseStudyId &&
+        !videoStoryId &&
+        !storyId
+      ) {
+        let draftResult: ReturnType<typeof readCustomPlayDraft>;
+        try {
+          // Accessing sessionStorage can itself throw in restricted tabs; the
+          // helper additionally guards getItem/JSON.parse.
+          draftResult = readCustomPlayDraft(window.sessionStorage);
+        } catch {
+          draftResult = { status: "malformed" };
+        }
+        if (draftResult.status === "ok") {
+          const parsed = draftResult.draft;
+          livePayload = {
+            worldSetting: parsed.worldSetting,
+            styleGuide: parsed.styleGuide,
+            styleReferenceImage: parsed.styleReferenceImage || undefined,
+            playerName: parsed.playerName || undefined,
+            language: locale,
+          };
+          liveAudioEnabled = parsed.audioEnabled === true;
+        } else {
+          customDraftFailure = draftResult.status;
         }
       }
+    }
+
+    if (customDraftFailure) {
+      setCustomDraftIssue(customDraftFailure);
+      return;
     }
 
     // Lock orientation for the whole session. Both prebaked-card and live paths
@@ -2478,42 +2771,55 @@ function PlayInner() {
     setFirstFrameProgress(
       loadingProgress(
         locale,
-        storyId ? 20 : caseStudyId ? 22 : cardName ? 24 : 8,
-        storyId ? "saved" : caseStudyId || cardName ? "template" : "init",
+        storyId ? 20 : caseStudyId || videoStoryId ? 22 : cardName ? 24 : 8,
+        storyId ? "saved" : caseStudyId || videoStoryId || cardName ? "template" : "init",
         initialUsageDetail,
       ),
     );
 
-    if (!cardName && !caseStudyId && !livePayload && !storyId) {
+    if (!cardName && !caseStudyId && !videoStoryId && !livePayload && !storyId) {
       router.replace(lp("/"));
       return;
     }
 
-    if (caseStudyId) {
+    if (caseStudyId || videoStoryId) {
       (async () => {
         try {
-          const savedId = `case:${caseStudyId}`;
+          const authoredId = caseStudyId || videoStoryId!;
+          const savedId = caseStudyId
+            ? `case:${authoredId}`
+            : `video-story:${authoredId}`;
           const saved = await loadStorySession(savedId);
           const response = await fetch(
-            `/case-studies/${encodeURIComponent(caseStudyId)}/story.json`,
+            caseStudyId
+              ? `/case-studies/${encodeURIComponent(authoredId)}/story.json`
+              : `/api/video-stories/${encodeURIComponent(authoredId)}`,
           );
-          if (!response.ok) throw new Error("本地案例内容尚未完成入库");
+          if (!response.ok) {
+            throw new Error(
+              caseStudyId
+                ? "本地案例内容尚未完成入库"
+                : "互动视频剧情不存在、已下线或发布物不可用",
+            );
+          }
           const bundle = (await response.json()) as CaseStudyPublishedBundle;
           if (
             bundle.kind !== "aistory-authored-case" ||
-            bundle.session.authoredStory?.caseStudyId !== caseStudyId
+            bundle.session.authoredStory?.caseStudyId !== authoredId
           ) {
-            throw new Error("本地案例数据格式不合法");
+            throw new Error("作者锁定剧情数据格式不合法");
           }
           const publishedVersion = bundle.session.authoredStory.version;
           const resumedSaved =
-            saved?.authoredStory?.caseStudyId === caseStudyId &&
+            saved?.authoredStory?.caseStudyId === authoredId &&
             saved.authoredStory.version === publishedVersion;
           const caseSession = resumedSaved ? saved : bundle.session;
           const runtime = caseSession.authoredStory;
           if (!runtime) throw new Error("本地案例缺少 authored graph");
           const currentNode = findAuthoredNode(runtime, runtime.currentNodeId);
-          if (!currentNode?.scene.imageUrl) throw new Error("本地案例当前画面不可用");
+          if (!currentNode || !sceneHasRenderableMedia(currentNode.scene)) {
+            throw new Error("本地案例当前画面不可用");
+          }
           const currentEntry = caseSession.history.at(-1);
           const resumeScene = currentEntry?.scene ?? currentNode.scene;
           const resumeBeat = resumeScene.beats.some(
@@ -2521,10 +2827,13 @@ function PlayInner() {
           )
             ? runtime.currentBeatId
             : resumeScene.entryBeatId;
-          const originalImage = resumeScene.imageUrl || currentNode.scene.imageUrl;
+          const originalImage =
+            scenePosterUrl(resumeScene) || scenePosterUrl(currentNode.scene);
           setFirstFrameProgress(loadingProgress(locale, 72, "image"));
-          const blobUrl = await getOrCreateBlobUrl(originalImage);
-          lastImageOriginalUrlRef.current = originalImage;
+          const blobUrl = originalImage
+            ? await getOrCreateBlobUrl(originalImage)
+            : null;
+          lastImageOriginalUrlRef.current = originalImage ?? null;
           visitedBeatsRef.current = currentEntry?.visitedBeatIds?.length
             ? [...currentEntry.visitedBeatIds]
             : [resumeScene.entryBeatId];
@@ -2583,13 +2892,13 @@ function PlayInner() {
         const history = loadedSession.history;
         let resumeEntry = history[history.length - 1];
         for (let i = history.length - 1; i >= 0; i--) {
-          if (history[i]?.scene?.imageUrl) {
+          if (sceneHasRenderableMedia(history[i]?.scene)) {
             resumeEntry = history[i];
             break;
           }
         }
         const resumeScene = resumeEntry?.scene;
-        if (!resumeScene?.imageUrl) {
+        if (!resumeScene || !sceneHasRenderableMedia(resumeScene)) {
           setError(t("play.savedStoryCorrupted"));
           return;
         }
@@ -2602,8 +2911,11 @@ function PlayInner() {
         }
         try {
           setFirstFrameProgress(loadingProgress(locale, 72, "image"));
-          const blobUrl = await getOrCreateBlobUrl(resumeScene.imageUrl);
-          lastImageOriginalUrlRef.current = resumeScene.imageUrl;
+          const resumePoster = scenePosterUrl(resumeScene);
+          const blobUrl = resumePoster
+            ? await getOrCreateBlobUrl(resumePoster)
+            : null;
+          lastImageOriginalUrlRef.current = resumePoster ?? null;
           setSession(loadedSession);
           setCurrentScene(resumeScene);
           setCurrentBeatId(resumeScene.entryBeatId);
@@ -2753,13 +3065,31 @@ function PlayInner() {
         track("scene_reached", { scene_index: initial.history.length });
       })
       .catch((e) => {
+        // A first-load 401 is a paused state, not an error: do not jump the
+        // canvas progress to 100%/error and do not leave a blank loading
+        // screen. The paused screen keeps the draft and offers sign-in home.
+        if (e instanceof AuthRequiredError) {
+          markFirstLoadAuthRequired(e);
+          return;
+        }
         setFirstFrameProgress(loadingProgress(locale, 100, "error"));
         if (!handleAuthError(e)) {
           trackPlayError("start", e, startT0);
-          setError(String(e));
+          if (isPlatformGenerationUnavailable(e)) {
+            setPlatformGenerationUnavailable(true);
+            setError(t("play.error.platformUnavailableTitle"));
+          } else {
+            setError(e instanceof Error ? e.message : String(e));
+          }
         }
       });
-  }, [params, router, retryBootstrap, restorePlayResume]);
+  }, [
+    params,
+    router,
+    retryBootstrap,
+    restorePlayResume,
+    markFirstLoadAuthRequired,
+  ]);
 
   // ── Deferred replay of the action that hit 401 (OAuth resume) ─────────
   // After restorePlayResume commits the restored session/scene/beat, dispatch
@@ -2871,6 +3201,62 @@ function PlayInner() {
     setCurrentBeatId(beat.next.nextBeatId);
   }
 
+  function onVideoComplete(event: VideoStoryCompletion) {
+    const scene = currentSceneRef.current;
+    const currentSession = sessionRef.current;
+    if (!scene || !currentSession) return;
+    const media = coerceSceneMedia(scene);
+    if (media.kind !== "video") return;
+    const key = `${currentSession.timeline?.activeBranchId || "main"}:${currentSession.history.length}:${scene.id}`;
+    if (videoInteractionKey === key) return;
+    setVideoInteractionKey(key);
+    track("video_playback_complete", {
+      completion_reason: event.reason,
+      scene_index: currentSession.history.length,
+    });
+    if (
+      media.endBehavior === "advance-beat" &&
+      media.authoredTargetNodeId &&
+      currentSession.authoredStory
+    ) {
+      const choice: BeatChoice = {
+        id: `${scene.id}:video-auto-advance`,
+        label: "视频播放完成",
+        effect: {
+          kind: "change-scene",
+          nextSceneSeed: `video-story:${scene.id}:auto`,
+          authoredTargetNodeId: media.authoredTargetNodeId,
+          ...(media.authoredVariableDelta
+            ? { variableDelta: media.authoredVariableDelta }
+            : {}),
+        },
+      };
+      const changeSceneEffect = choice.effect;
+      const exit: SceneExit = {
+        kind: "choice",
+        choiceId: choice.id,
+        label: choice.label,
+        nextSceneSeed:
+          changeSceneEffect.kind === "change-scene"
+            ? changeSceneEffect.nextSceneSeed
+            : `video-story:${scene.id}:auto`,
+      };
+      void performAuthoredStoryTransition(
+        currentSession,
+        choice,
+        exit,
+        [...visitedBeatsRef.current],
+      );
+      return;
+    }
+    if (
+      media.endBehavior === "advance-beat" &&
+      currentBeatRef.current?.next.type === "continue"
+    ) {
+      setCurrentBeatId(currentBeatRef.current.next.nextBeatId);
+    }
+  }
+
   async function performAuthoredStoryTransition(
     baseSession: Session,
     choice: BeatChoice,
@@ -2882,7 +3268,7 @@ function PlayInner() {
     const runtime = baseSession.authoredStory;
     if (!runtime || !targetNodeId) return;
     const target = findAuthoredNode(runtime, targetNodeId);
-    if (!target?.scene.imageUrl) {
+    if (!target || !sceneHasRenderableMedia(target.scene)) {
       setError("案例目标节点或画面不存在");
       return;
     }
@@ -2890,8 +3276,10 @@ function PlayInner() {
     setPendingClick(null);
     clearPool(poolRef.current);
     try {
-      const originalImage = target.scene.imageUrl;
-      const blobUrl = await getOrCreateBlobUrl(originalImage);
+      const originalImage = scenePosterUrl(target.scene);
+      const blobUrl = originalImage
+        ? await getOrCreateBlobUrl(originalImage)
+        : null;
       let nextSession = transitionAuthoredStorySession(
         baseSession,
         choice,
@@ -2909,7 +3297,7 @@ function PlayInner() {
       setSession(nextSession);
       setCurrentScene(target.scene);
       setCurrentBeatId(target.scene.entryBeatId);
-      lastImageOriginalUrlRef.current = originalImage;
+      lastImageOriginalUrlRef.current = originalImage ?? null;
       const ready = waitForImageReady();
       setImageUrl(blobUrl);
       setLastExitLabel(choice.label);
@@ -3031,13 +3419,18 @@ function PlayInner() {
       setPhase("transitioning");
       setPendingClick(null);
       try {
-        if (!next.scene.imageUrl) throw new Error(t("play.shareErrors.noNextImage"));
-        const blobUrl = await getOrCreateBlobUrl(next.scene.imageUrl);
+        if (!sceneHasRenderableMedia(next.scene)) {
+          throw new Error(t("play.shareErrors.noNextImage"));
+        }
+        const nextPoster = scenePosterUrl(next.scene);
+        const blobUrl = nextPoster
+          ? await getOrCreateBlobUrl(nextPoster)
+          : null;
         const priorOriginal = lastImageOriginalUrlRef.current;
-        if (priorOriginal && priorOriginal !== next.scene.imageUrl) {
+        if (priorOriginal && priorOriginal !== nextPoster) {
           revokeBlobUrlFor(priorOriginal);
         }
-        lastImageOriginalUrlRef.current = next.scene.imageUrl;
+        lastImageOriginalUrlRef.current = nextPoster ?? null;
 
         const base = sessionRef.current;
         if (!base) throw new Error("Session lost mid-replay");
@@ -3143,6 +3536,12 @@ function PlayInner() {
   function onSelectChoice(choice: BeatChoice) {
     if (phase !== "ready" || !session || !currentScene) return;
     if (isDisabledByRecordedReplay(choice)) return;
+    if (
+      session.authoredStory &&
+      !isAuthoredChoiceAvailable(choice, session.authoredStory.variables)
+    ) {
+      return;
+    }
 
     const beatNext = currentBeatRef.current?.next;
     const choiceIndex =
@@ -3213,11 +3612,10 @@ function PlayInner() {
       );
       return;
     }
-    if (
-      timelineSession.authoredStory?.authorLocked &&
-      !isAuthoredAiContinuationAllowed(timelineSession.authoredStory)
-    ) {
-      setError("作者锁定章节只能使用原稿选项继续");
+    if (isAuthorLockedScene(timelineSession)) {
+      // Nonfatal: authored scenes stay playable, but a non-authored fallback
+      // must never trigger a provider request.
+      showPlayNotice("作者锁定章节只能使用原稿选项继续");
       clearPool(poolRef.current);
       return;
     }
@@ -3281,11 +3679,9 @@ function PlayInner() {
 
   async function onFreeformInput(text: string) {
     if (phase !== "ready" || !session || !currentScene) return;
-    if (
-      session.authoredStory?.authorLocked &&
-      !isAuthoredAiContinuationAllowed(session.authoredStory)
-    ) {
-      setError("作者锁定章节只能使用原稿选项继续");
+    if (isAuthorLockedScene(session)) {
+      // Nonfatal authored-lock guard: no provider request, keep the scene.
+      showPlayNotice("作者锁定章节只能使用原稿选项继续");
       return;
     }
     // Detach if we're still replaying a shared story (gate on replaySourceRef,
@@ -3348,11 +3744,9 @@ function PlayInner() {
 
   async function onBackgroundClick(click: { x: number; y: number }) {
     if (phase !== "ready" || !session || !currentScene || !imageUrl) return;
-    if (
-      session.authoredStory?.authorLocked &&
-      !isAuthoredAiContinuationAllowed(session.authoredStory)
-    ) {
-      setError("作者锁定章节不启用画面识别或 AI 改写");
+    if (isAuthorLockedScene(session)) {
+      // Nonfatal authored-lock guard: no vision/insert-beat provider request.
+      showPlayNotice("作者锁定章节不启用画面识别或 AI 改写");
       return;
     }
     // Gate on replaySourceRef, not replayActiveRef (false for a single-scene
@@ -3636,6 +4030,16 @@ function PlayInner() {
         decision.id,
         choiceId,
       );
+      if (
+        forked.session.authoredStory &&
+        !isAuthoredChoiceAvailable(
+          choice,
+          forked.session.authoredStory.variables,
+        )
+      ) {
+        setError("该选项在此时间线的变量条件下不可用");
+        return;
+      }
       clearPool(poolRef.current);
       sessionRef.current = forked.session;
       setSession(forked.session);
@@ -3645,15 +4049,19 @@ function PlayInner() {
 
       if (forked.reused) {
         const restoredScene = restoredEntry.scene;
-        const restoredImage = restoredScene.imageUrl;
-        if (!restoredImage) throw new Error("该时间线的画面尚不可用");
-        const blobUrl = await getOrCreateBlobUrl(restoredImage);
+        if (!sceneHasRenderableMedia(restoredScene)) {
+          throw new Error("该时间线的画面尚不可用");
+        }
+        const restoredImage = scenePosterUrl(restoredScene);
+        const blobUrl = restoredImage
+          ? await getOrCreateBlobUrl(restoredImage)
+          : null;
         setCurrentScene(restoredScene);
         setCurrentBeatId(
           restoredEntry.visitedBeatIds.at(-1) || restoredScene.entryBeatId,
         );
         setImageUrl(blobUrl);
-        lastImageOriginalUrlRef.current = restoredImage;
+        lastImageOriginalUrlRef.current = restoredImage ?? null;
         setPhase("ready");
         void saveStory(forked.session);
         return;
@@ -3719,26 +4127,286 @@ function PlayInner() {
           .filter((choice) => !replayAllowedChoiceIds.has(choice.id))
           .map((choice) => choice.id)
       : [];
+  const disabledConditionChoiceIds =
+    currentBeat?.next.type === "choice" && session?.authoredStory
+      ? currentBeat.next.choices
+          .filter(
+            (choice) =>
+              !isAuthoredChoiceAvailable(
+                choice,
+                session.authoredStory!.variables,
+              ),
+          )
+          .map((choice) => choice.id)
+      : [];
+  const disabledChoiceIds = [
+    ...new Set([
+      ...disabledReplayChoiceIds,
+      ...disabledConditionChoiceIds,
+    ]),
+  ];
   const replayLocked = isRecordedReplayLockedAt(currentBeat);
+  // Authored-locked scenes keep only their authored transitions. Freeform text
+  // and vision/background clicks are plain AI continuations, so hide those
+  // affordances in BOTH PlayCanvas layouts rather than letting them fall into a
+  // handler that must reject the request afterwards.
+  const authorLockedScene = isAuthorLockedScene(session);
+  const recoveryCopy = playIssueRecoveryCopy(locale);
+  const importRecoveryCopy = STORY_IMPORT_RECOVERY_COPY;
 
-  if (error) {
+  if (customDraftIssue) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-8">
-        <div className="max-w-md text-center animate-fade-in">
-          <p className="text-[10px] smallcaps text-clay-500 mb-6">
-            {t("play.error.title")}
+      <div className="ui-page flex min-h-screen items-center justify-center px-5 py-10">
+        <div className="ui-surface w-full max-w-xl rounded-2xl p-6 text-center shadow-[0_24px_70px_rgba(49,91,255,0.12)] sm:p-9">
+          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-ember-500/10 text-ember-500">
+            <i className="fa-solid fa-file-circle-exclamation text-lg" />
+          </span>
+          <p className="mt-5 text-[10px] smallcaps text-clay-500">
+            {recoveryCopy.customDraftEyebrow}
           </p>
-          <p className="font-serif italic text-clay-900 text-lg leading-[1.7] mb-6">
-            {error}
+          <h1 className="mt-3 font-serif text-2xl font-semibold text-clay-900">
+            {recoveryCopy.customDraftTitle}
+          </h1>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-clay-600">
+            {recoveryCopy.customDraftBody}
           </p>
-          <Link
-            href={lp("/")}
-            className="mt-4 text-[10px] smallcaps text-clay-700 hover:text-ember-500 transition-colors inline-flex items-center gap-3"
-          >
-            <i className="fa-solid fa-arrow-left text-[9px]" />
-            {t("play.error.back")}
-          </Link>
+          <p className="mx-auto mt-3 max-w-md rounded-xl bg-cream-100 px-4 py-3 text-xs leading-6 text-clay-500">
+            {customDraftIssue === "malformed"
+              ? recoveryCopy.customDraftMalformedNote
+              : recoveryCopy.customDraftMissingNote}
+          </p>
+          <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+            <Link
+              href={safeReturn.href}
+              className="ui-button-primary min-h-11 rounded-xl px-5 py-3 text-sm"
+            >
+              <i className="fa-solid fa-arrow-left" />
+              {safeReturn.fromReturnTo
+                ? safeReturn.label
+                : recoveryCopy.customDraftHome}
+            </Link>
+          </div>
         </div>
+      </div>
+    );
+  }
+
+  if (importIssue) {
+    // Dedicated recovery for ?share=1 when this tab has no usable imported
+    // story file. It deliberately renders before the generic first-load error
+    // and never offers the settings/models route: the file is missing or
+    // corrupt, so no provider retry could help and no paid generation is
+    // started.
+    return (
+      <div className="ui-page flex min-h-screen items-center justify-center px-5 py-10">
+        <div className="ui-surface w-full max-w-xl rounded-2xl p-6 text-center shadow-[0_24px_70px_rgba(49,91,255,0.12)] sm:p-9">
+          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-ember-500/10 text-ember-500">
+            <i className="fa-solid fa-file-circle-exclamation text-lg" />
+          </span>
+          <p className="mt-5 text-[10px] smallcaps text-clay-500">
+            {importRecoveryCopy.eyebrow}
+          </p>
+          <h1 className="mt-3 font-serif text-2xl font-semibold text-clay-900">
+            {importIssue === "missing"
+              ? importRecoveryCopy.missingTitle
+              : importRecoveryCopy.malformedTitle}
+          </h1>
+          {/* Fixed copy only — the raw storage/parse error and any imported
+              story content must never be rendered here. */}
+          <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-clay-600">
+            {importRecoveryCopy.body}
+          </p>
+          <p className="mx-auto mt-3 max-w-md rounded-xl bg-cream-100 px-4 py-3 text-xs leading-6 text-clay-500">
+            {importIssue === "missing"
+              ? importRecoveryCopy.missingNote
+              : importIssue === "unavailable"
+                ? importRecoveryCopy.unavailableNote
+                : importRecoveryCopy.malformedNote}
+          </p>
+          <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+            {/* Intentionally the localized home, never an arbitrary returnTo:
+                the story file has to be re-imported from home. */}
+            <Link
+              href={lp("/")}
+              className="ui-button-primary min-h-11 rounded-xl px-5 py-3 text-sm"
+            >
+              <i className="fa-solid fa-arrow-left" />
+              {importRecoveryCopy.homeImport}
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (firstLoadAuthRequirement) {
+    return (
+      <div className="ui-page flex min-h-screen items-center justify-center px-5 py-10">
+        <div className="ui-surface w-full max-w-xl rounded-2xl p-6 text-center shadow-[0_24px_70px_rgba(49,91,255,0.12)] sm:p-9">
+          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-ember-500/10 text-ember-500">
+            <i className="fa-solid fa-lock text-lg" />
+          </span>
+          <p className="mt-5 text-[10px] smallcaps text-clay-500">
+            {recoveryCopy.authPausedEyebrow}
+          </p>
+          <h1 className="mt-3 font-serif text-2xl font-semibold text-clay-900">
+            {recoveryCopy.authPausedTitle}
+          </h1>
+          {/* The paused screen shows only fixed localized copy. The raw
+              backend/AuthRequiredError text must never be rendered here; the
+              requirement object is still handed to AuthModal, which owns
+              sanitizing its own body. */}
+          <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-clay-600">
+            {recoveryCopy.authPausedBody}
+          </p>
+          <p className="mx-auto mt-3 max-w-md rounded-xl bg-cream-100 px-4 py-3 text-xs leading-6 text-clay-500">
+            {recoveryCopy.authPausedDraftNote}
+          </p>
+          <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthRequirement(firstLoadAuthRequirement);
+                setAuthModalOpen(true);
+              }}
+              className="ui-button-primary min-h-11 rounded-xl px-5 py-3 text-sm"
+            >
+              <i className="fa-solid fa-right-to-bracket" />
+              {recoveryCopy.authReopenLogin}
+            </button>
+            <Link
+              href={safeReturn.href}
+              className="ui-button-secondary min-h-11 rounded-xl px-5 py-3 text-sm"
+            >
+              <i className="fa-solid fa-house" />
+              {safeReturn.fromReturnTo ? safeReturn.label : recoveryCopy.authHome}
+            </Link>
+          </div>
+        </div>
+        {authModalOpen && (
+          <AuthModal
+            onClose={closeAuthModal}
+            onSuccess={completeAuthModal}
+            requirement={authRequirement}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (error && !hasPreservedCanvas) {
+    if (platformGenerationUnavailable) {
+      return (
+        <div className="ui-page flex min-h-screen items-center justify-center px-5 py-10">
+          <div className="ui-surface w-full max-w-xl rounded-2xl p-6 text-center shadow-[0_24px_70px_rgba(49,91,255,0.12)] sm:p-9">
+            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-ember-500/10 text-ember-500">
+              <i className="fa-solid fa-wand-magic-sparkles text-lg" />
+            </span>
+            <p className="mt-5 text-[10px] smallcaps text-clay-500">
+              {t("play.error.platformUnavailableEyebrow")}
+            </p>
+            <h1 className="mt-3 font-serif text-2xl font-semibold text-clay-900">
+              {t("play.error.platformUnavailableTitle")}
+            </h1>
+            <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-clay-600">
+              {t("play.error.platformUnavailableDescription")}
+            </p>
+            <p className="mx-auto mt-3 max-w-md rounded-xl bg-cream-100 px-4 py-3 text-xs leading-6 text-clay-500">
+              {t("play.error.platformUnavailableSafety")}
+            </p>
+            <p className="mx-auto mt-3 max-w-md text-xs leading-6 text-clay-500">
+              {firstLoadErrorCopy.safetyNote}
+            </p>
+            <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+              <Link
+                href={lp("/stories")}
+                className="ui-button-primary min-h-11 rounded-xl px-5 py-3 text-sm"
+              >
+                <i className="fa-solid fa-book-open" />
+                {t("play.error.chooseFreeStory")}
+              </Link>
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                className="ui-button-secondary min-h-11 rounded-xl px-5 py-3 text-sm"
+              >
+                <i className="fa-solid fa-key" />
+                {t("play.error.configureByok")}
+              </button>
+              <a
+                href={safeReturn.href}
+                className="ui-button-secondary min-h-11 rounded-xl px-5 py-3 text-sm"
+              >
+                <i className="fa-solid fa-arrow-left" />
+                {firstLoadErrorCopy.backLabel}
+              </a>
+            </div>
+          </div>
+          {settingsOpen && (
+            <SettingsModal
+              initialTab="models"
+              initialVisionClickEnabled={visionClickEnabled}
+              onClose={() => setSettingsOpen(false)}
+              onSaved={handleSettingsSaved}
+              footerNote={t("play.settingsFooter")}
+            />
+          )}
+        </div>
+      );
+    }
+    return (
+      <div className="ui-page min-h-screen flex flex-col items-center justify-center px-8">
+        <div className="ui-surface max-w-md rounded-2xl p-8 text-center shadow-[0_24px_70px_rgba(49,91,255,0.1)] animate-fade-in">
+          <p className="text-[10px] smallcaps text-clay-500 mb-6">
+            {firstLoadErrorCopy.eyebrow}
+          </p>
+          <h1 className="font-serif text-clay-900 text-lg leading-[1.7]">
+            {firstLoadErrorCopy.title}
+          </h1>
+          <p className="mt-3 font-serif text-clay-700 text-sm leading-7">
+            {firstLoadErrorCopy.body}
+          </p>
+          <p className="mt-4 rounded-xl bg-cream-100 px-4 py-3 text-xs leading-6 text-clay-500">
+            {firstLoadErrorCopy.safetyNote}
+          </p>
+          {/* First load has no canvas to preserve, so give the player a real
+              next step: inspect the model/settings, or pick a ready demo. */}
+          <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="ui-button-primary min-h-11 rounded-xl px-5 py-3 text-sm"
+              data-first-load-action="settings"
+            >
+              <i className="fa-solid fa-sliders" />
+              {PLAY_FIRST_LOAD_SETTINGS_LABEL}
+            </button>
+            <Link
+              href={lp("/stories")}
+              className="ui-button-secondary min-h-11 rounded-xl px-5 py-3 text-sm"
+              data-first-load-action="demo"
+            >
+              <i className="fa-solid fa-book-open" />
+              {PLAY_FIRST_LOAD_DEMO_LABEL}
+            </Link>
+            <a
+              href={safeReturn.href}
+              className="ui-button-secondary min-h-11 rounded-xl px-5 py-3 text-sm"
+            >
+              <i className="fa-solid fa-arrow-left" />
+              {firstLoadErrorCopy.backLabel}
+            </a>
+          </div>
+        </div>
+        {settingsOpen && (
+          <SettingsModal
+            initialTab="models"
+            initialVisionClickEnabled={visionClickEnabled}
+            onClose={() => setSettingsOpen(false)}
+            onSaved={handleSettingsSaved}
+            footerNote={t("play.settingsFooter")}
+          />
+        )}
       </div>
     );
   }
@@ -3751,10 +4419,17 @@ function PlayInner() {
 
   if (immersive) {
     return (
-      <div className="fixed inset-0 bg-black flex items-center justify-center z-50">
+      <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black">
+        <div
+          className={`flex min-h-full w-full flex-col items-center justify-center ${
+            endOfDemoNotice ? "pb-4" : ""
+          }`}
+        >
+        <SteamDesktopBridge enabled={steamChannel} />
         <PlayCanvas
+          scene={currentScene}
           imageUrl={imageUrl}
-          audioSrc={audioSrc}
+          audioSrc={currentSceneMedia.kind === "video" && currentSceneMedia.hasAudio ? null : audioSrc}
           muted={muted}
           phase={phase}
           beat={currentBeat}
@@ -3762,11 +4437,15 @@ function PlayInner() {
           onBackgroundClick={onBackgroundClick}
           onAdvance={onAdvance}
           onSelectChoice={onSelectChoice}
-          onFreeformInput={onFreeformInput}
+          onFreeformInput={authorLockedScene ? undefined : onFreeformInput}
           orientation={orientation}
           playerName={session?.playerName}
           characters={session?.characters ?? []}
-          visionClickEnabled={visionClickEnabled}
+          visionClickEnabled={
+            !authorLockedScene &&
+            visionClickEnabled &&
+            (!currentScene || videoAllowsSceneInteraction(currentScene))
+          }
           onOpenSettings={() => {
             setSettingsOpen(true);
             showPlayNotice("设置已打开");
@@ -3781,10 +4460,25 @@ function PlayInner() {
           onReselectDecision={(decision, choiceId) =>
             void handleReselectDecision(decision, choiceId)
           }
-          disabledChoiceIds={disabledReplayChoiceIds}
-          freeformDisabled={replayLocked}
+          disabledChoiceIds={disabledChoiceIds}
+          freeformDisabled={
+            authorLockedScene ||
+            replayLocked ||
+            (!!currentScene && !videoAllowsSceneInteraction(currentScene))
+          }
           loadingProgress={firstFrameProgress}
+          videoInteractionUnlocked={videoInteractionUnlocked}
+          onVideoComplete={onVideoComplete}
+          endOfDemo={endOfDemoNotice}
+          onReplayEndOfDemo={handleReplayEndOfDemo}
         />
+        {canvasErrorBanner}
+        {showSteamCompletion && (
+          <SteamCompletionCta
+            aboutHref={`${lp("/steam")}?view=about`}
+            compact
+          />
+        )}
         {playNotice && <PlayNoticeToast message={playNotice} />}
         {roleNotice && <RoleToast message={roleNotice} />}
         {charactersOpen && (
@@ -3816,8 +4510,8 @@ function PlayInner() {
             style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
           >
             <Link
-              href={lp("/")}
-              onClick={() => showPlayNotice("返回首页")}
+              href={safeReturn.href}
+              onClick={() => showPlayNotice("返回")}
               className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white/80 backdrop-blur-sm transition-colors hover:text-white"
               aria-label={t("play.tooltips.back")}
             >
@@ -3845,24 +4539,12 @@ function PlayInner() {
         )}
         {authModalOpen && (
           <AuthModal
-            onClose={() => {
-              setAuthModalOpen(false);
-              setAuthRequirement(undefined);
-              // User dismissed login — drop the retry, don't re-run the action.
-              authResolveRef.current = null;
-              pendingResumeActionRef.current = null;
-            }}
-            onSuccess={() => {
-              setAuthModalOpen(false);
-              setAuthRequirement(undefined);
-              const retry = authResolveRef.current;
-              authResolveRef.current = null;
-              pendingResumeActionRef.current = null;
-              retry?.();
-            }}
+            onClose={closeAuthModal}
+            onSuccess={completeAuthModal}
             requirement={authRequirement}
           />
         )}
+        </div>
       </div>
     );
   }
@@ -3882,11 +4564,13 @@ function PlayInner() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <SteamDesktopBridge enabled={steamChannel} />
+      {canvasErrorBanner}
       {exportProgress && (
         <div
           className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-full bg-black/75 px-4 py-2 text-[11px] smallcaps text-white/95 backdrop-blur-sm shadow-lg flex items-center gap-2"
         >
-          <i className="fa-solid fa-circle-notch animate-spin text-[11px] text-amber-300" />
+          <i className="fa-solid fa-circle-notch animate-spin text-[11px] text-blue-300" />
           <span>{exportProgress.label}</span>
           {exportProgress.total > 0 && (
             <span className="num text-white/70">
@@ -3899,8 +4583,8 @@ function PlayInner() {
       {roleNotice && <RoleToast message={roleNotice} />}
       <header className="px-5 md:px-12 pt-6 md:pt-8 flex items-center justify-between">
         <Link
-          href={lp("/")}
-          onClick={() => showPlayNotice("返回首页")}
+          href={safeReturn.href}
+          onClick={() => showPlayNotice("返回")}
           className="text-clay-600 hover:text-clay-900 transition-colors flex items-center gap-3"
         >
           <i className="fa-solid fa-arrow-left text-[12px]" />
@@ -3920,8 +4604,9 @@ function PlayInner() {
 
       <main className="flex-1 flex flex-col items-center justify-center px-4 md:px-8 py-6 md:py-10">
         <PlayCanvas
+          scene={currentScene}
           imageUrl={imageUrl}
-          audioSrc={audioSrc}
+          audioSrc={currentSceneMedia.kind === "video" && currentSceneMedia.hasAudio ? null : audioSrc}
           muted={muted}
           phase={phase}
           beat={currentBeat}
@@ -3929,11 +4614,15 @@ function PlayInner() {
           onBackgroundClick={onBackgroundClick}
           onAdvance={onAdvance}
           onSelectChoice={onSelectChoice}
-          onFreeformInput={onFreeformInput}
+          onFreeformInput={authorLockedScene ? undefined : onFreeformInput}
           orientation={orientation}
           playerName={session?.playerName}
           characters={session?.characters ?? []}
-          visionClickEnabled={visionClickEnabled}
+          visionClickEnabled={
+            !authorLockedScene &&
+            visionClickEnabled &&
+            (!currentScene || videoAllowsSceneInteraction(currentScene))
+          }
           onOpenSettings={() => {
             setSettingsOpen(true);
             showPlayNotice("设置已打开");
@@ -3947,9 +4636,17 @@ function PlayInner() {
           onReselectDecision={(decision, choiceId) =>
             void handleReselectDecision(decision, choiceId)
           }
-          disabledChoiceIds={disabledReplayChoiceIds}
-          freeformDisabled={replayLocked}
+          disabledChoiceIds={disabledChoiceIds}
+          freeformDisabled={
+            authorLockedScene ||
+            replayLocked ||
+            (!!currentScene && !videoAllowsSceneInteraction(currentScene))
+          }
           loadingProgress={firstFrameProgress}
+          videoInteractionUnlocked={videoInteractionUnlocked}
+          onVideoComplete={onVideoComplete}
+          endOfDemo={endOfDemoNotice}
+          onReplayEndOfDemo={handleReplayEndOfDemo}
           aboveCanvas={
             <button
               type="button"
@@ -3981,11 +4678,11 @@ function PlayInner() {
                   onClick={() => void handleExportStory()}
                   disabled={!!exportProgress}
                   className="text-[10px] smallcaps text-clay-500 hover:text-ember-500 transition-colors flex items-center gap-2 disabled:opacity-50"
-                  aria-label={t("play.tooltips.shareStoryLabel")}
-                  title={t("play.tooltips.shareStory")}
+                  aria-label={STORY_ARCHIVE_EXPORT_TITLE}
+                  title={STORY_ARCHIVE_EXPORT_TITLE}
                 >
                   <i className="fa-solid fa-share-nodes text-[10px]" />
-                  {t("play.buttons.shareStory")}
+                  {STORY_ARCHIVE_EXPORT_LABEL}
                 </button>
               </>
             ) : null
@@ -4040,6 +4737,19 @@ function PlayInner() {
           }
         />
 
+        {showSteamCompletion && (
+          <SteamCompletionCta aboutHref={`${lp("/steam")}?view=about`} />
+        )}
+
+        {session && session.history.length > 0 ? (
+          <div className="mt-4 w-full max-w-2xl px-4">
+            <SharedStoryPublishPanel
+              key={session.id}
+              session={session}
+            />
+          </div>
+        ) : null}
+
         <div className="mt-4 max-w-md w-full text-center min-h-[28px] flex items-center justify-center">
           {phase === "loading-first" && (
             <p className="text-[10px] smallcaps text-clay-500 animate-slow-pulse">
@@ -4089,21 +4799,8 @@ function PlayInner() {
       />
       {authModalOpen && (
         <AuthModal
-          onClose={() => {
-            setAuthModalOpen(false);
-            setAuthRequirement(undefined);
-            // User dismissed login — drop the retry, don't re-run the action.
-            authResolveRef.current = null;
-            pendingResumeActionRef.current = null;
-          }}
-          onSuccess={() => {
-            setAuthModalOpen(false);
-            setAuthRequirement(undefined);
-            const retry = authResolveRef.current;
-            authResolveRef.current = null;
-            pendingResumeActionRef.current = null;
-            retry?.();
-          }}
+          onClose={closeAuthModal}
+          onSuccess={completeAuthModal}
           requirement={authRequirement}
         />
       )}

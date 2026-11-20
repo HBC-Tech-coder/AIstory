@@ -1,0 +1,31 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "noEmit": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "app/api/auth/phone/request/route.ts",
+    "app/api/auth/phone/verify/route.ts",
+    "app/api/account/me/route.ts",
+    "app/api/stories/manifest/route.ts",
+    "app/api/stories/push/route.ts",
+    "app/api/stories/pull/route.ts",
+    "app/api/stories/delete/route.ts",
+    "app/api/tts-provider/route.ts",
+    "lib/auth/phoneInviteBetaGate.ts",
+    "lib/auth/userSession.ts",
+    "lib/supabase/guard.ts",
+    "scripts/test-phone-invite-beta-gate.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".next",
+    ".tmp",
+    "app/app",
+    "components/components",
+    "lib/lib"
+  ]
+}

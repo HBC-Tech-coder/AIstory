@@ -24,6 +24,7 @@ export class PhoneAuthError extends Error {
     readonly code: PhoneAuthErrorCode,
     readonly status: number,
     message: string,
+    readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "PhoneAuthError";

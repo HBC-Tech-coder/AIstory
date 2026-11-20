@@ -203,6 +203,8 @@ function buildByoProviderConfig(
  * Build EngineConfig with BYOK (Bring Your Own Key) overrides.
  * - `byo` param contains user-provided keys from request body (StartRequest.byo / SceneRequest.byo)
  * - For each role (text/image/vision), if user provided BYO config, use it; otherwise fallback to official keys
+ * - Server-side TTS is always disabled for BYOK requests. Browser-owned TTS
+ *   runs directly with the user's key and must never fall back to platform TTS.
  * - Validates all BYO baseUrls (SSRF protection) and throws on failure
  */
 export function buildByoEngineConfig(
@@ -219,7 +221,7 @@ export function buildByoEngineConfig(
     vision: byo.vision
       ? buildByoProviderConfig("vision", byo.vision, officialConfig.vision)
       : officialConfig.vision,
-    tts: officialConfig.tts, // TTS BYOK stays client-side only (existing flow)
+    tts: undefined,
     mockImage: officialConfig.mockImage,
   };
 }

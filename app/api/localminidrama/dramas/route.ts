@@ -4,10 +4,17 @@ import {
   listLocalMiniDramaDramas,
 } from "@/lib/localminidrama/server";
 import type { DreamFrameMiniDramaDraft } from "@/lib/localminidrama/types";
+import {
+  assertTrustedLoopbackMutation,
+  isLoopbackReadRequest,
+} from "@/lib/security/localMutation";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
+  if (!isLoopbackReadRequest(request)) {
+    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  }
   try {
     const page = Number(request.nextUrl.searchParams.get("page") || "1");
     const pageSize = Number(request.nextUrl.searchParams.get("page_size") || "8");
@@ -27,6 +34,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    assertTrustedLoopbackMutation(request);
     const draft = (await request.json()) as DreamFrameMiniDramaDraft;
     if (!draft.title?.trim() && !draft.summary?.trim() && !draft.sourceText?.trim()) {
       return NextResponse.json(
@@ -37,12 +45,15 @@ export async function POST(request: NextRequest) {
     const data = await createLocalMiniDramaDraft(draft);
     return NextResponse.json({ ok: true, data });
   } catch (error) {
+    const forbidden = error instanceof Error && error.message.includes("loopback");
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : "创建 LocalMiniDrama 草稿失败",
+        error: forbidden
+          ? "Forbidden"
+          : error instanceof Error ? error.message : "创建 LocalMiniDrama 草稿失败",
       },
-      { status: 502 },
+      { status: forbidden ? 403 : 502 },
     );
   }
 }

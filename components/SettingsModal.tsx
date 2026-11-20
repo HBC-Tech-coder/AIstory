@@ -2,7 +2,10 @@
 
 import { type ReactNode, useEffect, useState } from "react";
 import type { BranchPrefetchDepth, ProviderProtocol } from "@infiplot/types";
-import type { ByokPersistence } from "@/lib/credentials/types";
+import type {
+  ByokPersistence,
+  CredentialCustodyMode,
+} from "@/lib/credentials/types";
 import { coercePublicPrefetchDepth } from "@/lib/credentials/publicSettings";
 import {
   DEFAULT_BRANCH_PREFETCH_DEPTH,
@@ -15,6 +18,10 @@ import {
   writeStoredModelConfig,
 } from "@/lib/clientModelConfig";
 import { diagnoseByokCapabilities } from "@/lib/credentials/byokDiagnostics";
+import type {
+  HostedCredentialFeatureStatus,
+  HostedCredentialSummary,
+} from "@/lib/credentials/hosted/types";
 import {
   clearStoredTtsConfig,
   readStoredTtsConfig,
@@ -107,6 +114,7 @@ type UnifiedModelForm = {
 };
 
 type TabKey = "general" | "models";
+type CredentialCustody = Exclude<CredentialCustodyMode, "platform_managed">;
 
 export function SettingsModal({
   initialTab = "general",
@@ -140,6 +148,16 @@ export function SettingsModal({
   const [byokPersistence, setByokPersistence] = useState<ByokPersistence>(
     () => readByokPersistence(),
   );
+  const [credentialCustody, setCredentialCustody] =
+    useState<CredentialCustody>("device_byok");
+  const [hostedCapability, setHostedCapability] =
+    useState<"text" | "image" | "vision" | "video">("text");
+  const [hostedFeature, setHostedFeature] =
+    useState<HostedCredentialFeatureStatus | null>(null);
+  const [hostedCredentials, setHostedCredentials] =
+    useState<HostedCredentialSummary[]>([]);
+  const [hostedBusy, setHostedBusy] = useState(false);
+  const [hostedError, setHostedError] = useState("");
   const initialLooksUnified =
     !!initial &&
     initial.textBaseUrl === initial.imageBaseUrl &&
@@ -223,6 +241,37 @@ export function SettingsModal({
     return () => cancelAnimationFrame(id);
   }, []);
 
+  const refreshHostedCredentials = async () => {
+    setHostedBusy(true);
+    setHostedError("");
+    try {
+      const response = await fetch("/api/credentials/hosted", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      const payload = await response.json() as {
+        feature?: HostedCredentialFeatureStatus;
+        credentials?: HostedCredentialSummary[];
+        error?: string;
+      };
+      if (!response.ok) throw new Error(payload.error || t("settings.models.hostedUnavailable"));
+      setHostedFeature(payload.feature ?? null);
+      setHostedCredentials(Array.isArray(payload.credentials) ? payload.credentials : []);
+    } catch (error) {
+      setHostedFeature(null);
+      setHostedCredentials([]);
+      setHostedError(error instanceof Error ? error.message : t("settings.models.hostedUnavailable"));
+    } finally {
+      setHostedBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== "models" || credentialCustody !== "hosted_byok") return;
+    void refreshHostedCredentials();
+  }, [activeTab, credentialCustody]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
@@ -273,6 +322,7 @@ export function SettingsModal({
   };
 
   const saveModels = () => {
+    if (credentialCustody === "hosted_byok") return;
     const text = groups.find((g) => g.key === "text");
     const image = groups.find((g) => g.key === "image");
     const vision = groups.find((g) => g.key === "vision");
@@ -328,6 +378,86 @@ export function SettingsModal({
       writeStoredTtsConfig({ presetId, apiKey: key }, byokPersistence);
     } else {
       clearStoredTtsConfig();
+    }
+  };
+
+  const saveHostedCapability = async () => {
+    setHostedError("");
+    if (!hostedFeature?.writable) {
+      setHostedError(t("settings.models.hostedUnavailable"));
+      return;
+    }
+    const group = groups.find((item) => item.key === hostedCapability);
+    const draft = modelMode === "unified"
+      ? {
+          baseUrl: unified.baseUrl,
+          apiKey: unified.apiKey,
+          provider: unified.provider,
+          model: unified[`${hostedCapability}Model`],
+        }
+      : {
+          baseUrl: group?.baseUrl ?? "",
+          apiKey: group?.apiKey ?? "",
+          provider: group?.provider ?? "",
+          model: group?.model ?? "",
+        };
+    if (!draft.baseUrl.trim() || !draft.apiKey.trim() || !draft.provider || !draft.model.trim()) {
+      setHostedError(t("settings.models.hostedFieldsMissing"));
+      return;
+    }
+    setHostedBusy(true);
+    try {
+      const response = await fetch("/api/credentials/hosted", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: draft.provider,
+          capabilities: [hostedCapability],
+          defaultFor: [hostedCapability],
+          baseUrl: draft.baseUrl,
+          apiKey: draft.apiKey,
+          model: draft.model,
+          idempotencyKey: `hosted-save-${crypto.randomUUID()}`,
+          reason: "user opted into encrypted cross-device credential storage",
+        }),
+      });
+      const payload = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(payload.error || t("settings.models.hostedUnavailable"));
+      if (modelMode === "unified") {
+        setUnified((value) => ({ ...value, apiKey: "" }));
+      } else {
+        updateGroup(hostedCapability, "apiKey", "");
+      }
+      await refreshHostedCredentials();
+    } catch (error) {
+      setHostedError(error instanceof Error ? error.message : t("settings.models.hostedUnavailable"));
+    } finally {
+      setHostedBusy(false);
+    }
+  };
+
+  const deleteHostedProfile = async (credentialId: string) => {
+    setHostedBusy(true);
+    setHostedError("");
+    try {
+      const response = await fetch("/api/credentials/hosted", {
+        method: "DELETE",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          credentialId,
+          idempotencyKey: `hosted-delete-${crypto.randomUUID()}`,
+          reason: "user removed the hosted credential profile",
+        }),
+      });
+      const payload = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(payload.error || t("settings.models.hostedUnavailable"));
+      await refreshHostedCredentials();
+    } catch (error) {
+      setHostedError(error instanceof Error ? error.message : t("settings.models.hostedUnavailable"));
+    } finally {
+      setHostedBusy(false);
     }
   };
 
@@ -649,7 +779,34 @@ export function SettingsModal({
                     {t("settings.models.callEstimate")}
                   </p>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {(["device_byok", "hosted_byok"] as CredentialCustody[]).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setCredentialCustody(value)}
+                      className={`rounded-sm border px-3 py-2.5 text-left text-xs ${
+                        credentialCustody === value
+                          ? "border-ember-500 bg-ember-500/5 text-clay-900"
+                          : "border-clay-900/12 text-clay-500"
+                      }`}
+                    >
+                      <span className="block font-medium">
+                        {t(value === "device_byok"
+                          ? "settings.models.custodyDevice"
+                          : "settings.models.custodyHosted")}
+                      </span>
+                      <span className="mt-1 block text-[10px] leading-4 text-clay-400">
+                        {t(value === "device_byok"
+                          ? "settings.models.custodyDeviceHint"
+                          : "settings.models.custodyHostedHint")}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {credentialCustody === "device_byok" ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
                   {(["session", "local"] as ByokPersistence[]).map((value) => (
                     <button
                       key={value}
@@ -664,12 +821,88 @@ export function SettingsModal({
                       {t(`settings.models.persistence${value === "session" ? "Session" : "Local"}`)}
                     </button>
                   ))}
-                </div>
-                {byokPersistence === "local" ? (
+                    </div>
+                    {byokPersistence === "local" ? (
                   <p className="text-[11px] leading-relaxed text-amber-800">
                     {t("settings.models.sharedComputerRisk")}
                   </p>
-                ) : null}
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="rounded-sm border border-clay-900/10 bg-cream-100/55 p-3">
+                    <p className="text-xs font-semibold text-clay-800">
+                      {t("settings.models.hostedDisclosureTitle")}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-clay-500">
+                      {t("settings.models.hostedDisclosure")}
+                    </p>
+                    <p className="mt-2 text-[10px] leading-relaxed text-clay-400">
+                      {hostedFeature?.enabled
+                        ? t("settings.models.hostedReady")
+                        : t("settings.models.hostedUnavailable")}
+                    </p>
+                    {hostedError ? (
+                      <p role="alert" className="mt-2 text-[11px] leading-relaxed text-red-700">
+                        {hostedError}
+                      </p>
+                    ) : null}
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <select
+                        value={hostedCapability}
+                        onChange={(event) => setHostedCapability(
+                          event.target.value as typeof hostedCapability,
+                        )}
+                        className="h-9 min-w-0 flex-1 rounded-sm border border-clay-900/15 bg-cream-50 px-3 text-xs text-clay-900"
+                      >
+                        {(["text", "image", "vision", "video"] as const).map((capability) => (
+                          <option key={capability} value={capability}>
+                            {t(`settings.models.capability.${capability}`)}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={hostedBusy || !hostedFeature?.writable}
+                        onClick={() => void saveHostedCapability()}
+                        className="h-9 rounded-sm bg-clay-900 px-4 text-xs text-cream-50 disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {hostedBusy
+                          ? t("settings.models.hostedWorking")
+                          : t("settings.models.hostedSave")}
+                      </button>
+                    </div>
+                    <p className="mt-2 text-[10px] leading-4 text-clay-400">
+                      {t("settings.models.hostedTtsPending")}
+                    </p>
+                    {hostedCredentials.length > 0 ? (
+                      <div className="mt-3 space-y-2">
+                        {hostedCredentials.map((credential) => (
+                          <div
+                            key={credential.id}
+                            className="flex min-w-0 items-center justify-between gap-3 border border-clay-900/8 bg-cream-50 px-3 py-2"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-xs text-clay-800">
+                                {credential.maskedLabel}
+                              </p>
+                              <p className="text-[10px] text-clay-400">
+                                {credential.capabilities.join(" / ")}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={hostedBusy}
+                              onClick={() => void deleteHostedProfile(credential.id)}
+                              className="shrink-0 text-[11px] text-red-700 disabled:opacity-45"
+                            >
+                              {t("settings.models.hostedDelete")}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
                 <p className="text-[11px] leading-relaxed text-clay-400">
                   <i className="fa-solid fa-shield-halved mr-1.5" />
                   {t("settings.models.corsNotice")}

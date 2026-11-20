@@ -272,6 +272,14 @@ export const zhCN = {
     error: {
       title: "出 · 了 · 点 · 状 · 况",
       back: "返 · 回",
+      platformUnavailableEyebrow: "生成服务",
+      platformUnavailableTitle: "当前暂未开放平台生成",
+      platformUnavailableDescription:
+        "你仍可匿名体验已有故事、作者锁定剧情和缓存内容，或配置自己的 API 继续创作。",
+      platformUnavailableSafety:
+        "本次未发起平台模型调用，也不会展示未经服务端确认的价格或余额。",
+      chooseFreeStory: "返回免费体验 / 选择已有故事",
+      configureByok: "配置我的 API",
     },
 
     // Previous action
@@ -330,6 +338,19 @@ export const zhCN = {
     // Models tab
     models: {
       byokTitle: "我的 API（BYOK）",
+      custodyDevice: "仅此浏览器",
+      custodyDeviceHint: "保持现有 sessionStorage / localStorage 方式，Key 不写入 AIstory 账户。",
+      custodyHosted: "跨设备托管",
+      custodyHostedHint: "登录并近期验证后，可在 PC 保存并在手机或 iPad 使用。",
+      hostedDisclosureTitle: "加密同步到账号（可选）",
+      hostedDisclosure: "凭据会加密保存；当你明确使用它请求供应商时，AIstory 服务端必须在内存中短暂解密。它不是端到端加密，管理员界面也不提供读取或导出原 Key 的能力。供应商向你计费，AIstory 不扣平台积分。",
+      hostedReady: "托管仓储与近期验证门禁已就绪。保存时不会自动测试供应商。",
+      hostedUnavailable: "跨设备托管尚未启用；请继续使用仅此浏览器模式。",
+      hostedFieldsMissing: "请先为所选能力填写 Provider、Base URL、Model 和 API Key。",
+      hostedSave: "加密同步所选能力",
+      hostedWorking: "处理中…",
+      hostedDelete: "删除",
+      hostedTtsPending: "TTS 托管契约已预留；当前设置表单仍使用仅此浏览器的配音 Key，不会被自动上传。",
       costResponsibility: "使用我的 Key：费用由你的对应服务商账户承担。平台积分模式尚未开放，仅限受控内部测试。",
       callEstimate: "开始/续写通常会调用文本与图片能力；识图、配音、视频仅在对应功能触发时调用。实际费用以你的服务商账单为准。",
       persistenceSession: "仅本次会话（默认）",
@@ -413,15 +434,20 @@ export const zhCN = {
     phoneLogin: "手机号登录 / 注册",
     registrationHint:
       "未注册手机号验证成功后将自动注册；首次注册按当前政策赠送 1000 积分，同一账户仅一次。",
+    localProgressHint:
+      "登录后保留同一浏览器内可继承的剧情进度；不会读取或上传 API 密钥。",
     phonePlaceholder: "中国大陆手机号",
     sendCode: "获取短信验证码",
     sending: "发送中...",
+    resendCode: "重新获取验证码",
+    resendCountdown: "重新获取（{seconds}s）",
 
-    phoneCodeSent: "验证码已发送至 {phone}",
+    phoneCodeSent: "已收到 {phone} 的验证码请求。收到短信后，请输入验证码。",
     codePlaceholder: "6 位验证码",
     verify: "确认",
     verifying: "验证中...",
     resend: "重新发送",
+    changePhone: "更换手机号",
 
     close: "关闭",
     ariaLabel: "手机号登录 / 注册",
@@ -431,6 +457,20 @@ export const zhCN = {
     phoneInvalid: "请输入有效的中国大陆手机号。",
     smsRateLimited: "验证码请求过于频繁，请稍后再试。",
     smsUnavailable: "短信服务暂时不可用，验证码未发送。",
+    claimCompleteTitle: "登录成功",
+    claimNotFound: "未找到可继承的本机剧情进度，账户登录已完成。",
+    claimSummary:
+      "已继承 {stories} 个故事、{checkpoints} 个检查点；另有 {skipped} 项因版本或发布状态未继承。",
+    claimSkipReasonSummary: "未继承类别：{reasons}",
+    claimSkipNotPublished: "未发布或受限内容",
+    claimSkipVersionMismatch: "版本不一致",
+    claimSkipNodeUnavailable: "节点不可用",
+    claimSkipResourceUnavailable: "缓存资源不可用",
+    claimSkipAssignmentUnavailable: "实验版本不可用",
+    claimSkipManifestInvalid: "清单语义冲突",
+    claimRetryHint: "本机索引尚未完成切换；刷新后会按同一回执安全重试。",
+    sameBrowserOnly: "本阶段仅支持同一浏览器继承，不包含跨设备同步。",
+    continue: "继续",
   },
 
   // ========== Dialogue History Modal ==========

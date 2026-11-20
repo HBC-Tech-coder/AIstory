@@ -5,11 +5,16 @@ import {
   DialogueHistoryModal,
   type DialogueHistoryItem,
 } from "@/components/DialogueHistoryModal";
+import { SceneMediaCanvas } from "@/components/SceneMediaCanvas";
+import type { VideoStoryCompletion } from "@/components/VideoStoryPlayer";
+import { coerceSceneMedia } from "@/lib/sceneMedia";
+import type { PlayEndOfDemoNotice } from "@/lib/playerReviewPolicy";
 import type {
   Beat,
   BeatChoice,
   Character,
   Orientation,
+  Scene,
   TimelineDecision,
 } from "@infiplot/types";
 import { useI18n } from "@/lib/i18n/client";
@@ -32,7 +37,7 @@ export type LoadingProgress = {
 };
 
 const SHADOW =
-  "0 1px 0 rgba(45,24,16,0.05), 0 36px 64px -28px rgba(45,24,16,0.25), 0 8px 18px -6px rgba(45,24,16,0.10)";
+  "0 1px 0 rgba(49,91,255,0.06), 0 36px 64px -28px rgba(1,5,17,0.28), 0 8px 18px -6px rgba(49,91,255,0.12)";
 
 const DEFAULT_CHAR_MS = 28;
 const MIN_CHAR_MS = 30;
@@ -147,31 +152,31 @@ function ChoiceButton({
       className={`group relative ${vertical ? "w-full" : "flex-1 min-w-0"} px-4 py-3 text-left transition-all duration-200
         disabled:opacity-45 disabled:cursor-not-allowed`}
       style={{
-        background: "rgba(20, 14, 8, 0.68)",
-        border: "1.5px solid rgba(180, 140, 80, 0.65)",
+        background: "rgba(4, 9, 24, 0.72)",
+        border: "1.5px solid rgba(97, 129, 255, 0.68)",
         borderRadius: "6px",
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
-        boxShadow: "0 2px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(200,165,90,0.12)",
+        boxShadow: "0 2px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(125,151,255,0.16)",
       }}
     >
       <span
         className="absolute inset-0 rounded-[5px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
         style={{
-          background: "rgba(180,140,60,0.10)",
-          border: "1.5px solid rgba(200,165,90,0.85)",
+          background: "rgba(49,91,255,0.14)",
+          border: "1.5px solid rgba(125,151,255,0.88)",
         }}
       />
       <span className="relative flex items-baseline gap-2">
         <span
           className={`shrink-0 font-serif num ${vertical ? "text-[16px]" : "text-[14px]"}`}
-          style={{ color: "rgba(195,155,75,0.9)" }}
+          style={{ color: "rgba(133,158,255,0.96)" }}
         >
           {index + 1}.
         </span>
         <span
           className={`font-serif leading-snug ${vertical ? "text-[18px]" : "text-[16px] md:text-[17px]"}`}
-          style={{ color: "rgba(245,235,210,0.95)" }}
+          style={{ color: "rgba(245,248,255,0.96)" }}
         >
           {label}
         </span>
@@ -182,6 +187,7 @@ function ChoiceButton({
 
 // ── Main component ─────────────────────────────────────────────────────
 export function PlayCanvas({
+  scene,
   imageUrl,
   audioSrc,
   muted,
@@ -211,7 +217,11 @@ export function PlayCanvas({
   disabledChoiceIds = [],
   freeformDisabled = false,
   loadingProgress,
+  videoInteractionUnlocked = false,
+  onVideoComplete,
+  endOfDemo = null,
 }: {
+  scene?: Scene | null;
   imageUrl: string | null;
   audioSrc: string | null;
   muted: boolean;
@@ -246,6 +256,16 @@ export function PlayCanvas({
   disabledChoiceIds?: readonly string[];
   freeformDisabled?: boolean;
   loadingProgress?: LoadingProgress;
+  videoInteractionUnlocked?: boolean;
+  onVideoComplete?: (event: VideoStoryCompletion) => void;
+  /** Honest authored terminal notice + safe return control. */
+  endOfDemo?: PlayEndOfDemoNotice | null;
+  /**
+   * Accepted for compatibility but intentionally unused: the entry beat loops
+   * straight back into this same terminal notice, so "replay" was a no-op and
+   * the control has been removed from the notice.
+   */
+  onReplayEndOfDemo?: () => void;
 }) {
   const { t, locale } = useI18n();
   const defaultPlayerName =
@@ -263,7 +283,13 @@ export function PlayCanvas({
     undefined,
   );
 
-  const isChoiceBeat = beat?.next.type === "choice";
+  const sceneMedia = coerceSceneMedia(
+    scene ?? { media: undefined, imageUrl: imageUrl ?? undefined },
+  );
+  const isVideoScene = sceneMedia.kind === "video";
+  const videoHasAudio = isVideoScene && sceneMedia.hasAudio === true;
+  const showBeatOverlay = !isVideoScene || videoInteractionUnlocked;
+  const isChoiceBeat = showBeatOverlay && beat?.next.type === "choice";
   const choices: BeatChoice[] = isChoiceBeat
     ? (beat!.next as { type: "choice"; choices: BeatChoice[] }).choices
     : [];
@@ -286,7 +312,7 @@ export function PlayCanvas({
   const { shown: typedBody, done: typingDone, skip: skipTypewriter } =
     useTypewriter(displayBody, beat?.id ?? "", {
       targetDurationMs: audioDurationMs,
-      waitForAudio: Boolean(audioSrc),
+      waitForAudio: Boolean(audioSrc) && !videoHasAudio,
     });
 
   // ── Audio source change ──────────────────────────────────────────────
@@ -294,12 +320,12 @@ export function PlayCanvas({
   // unblock the typewriter via timeout so text doesn't stall.
   useEffect(() => {
     setAudioDurationMs(undefined);
-    if (!audioSrc) return;
+    if (!audioSrc || videoHasAudio) return;
     const timer = setTimeout(() => {
       setAudioDurationMs((prev) => prev ?? 0);
     }, AUDIO_WAIT_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [audioSrc]);
+  }, [audioSrc, videoHasAudio]);
 
   // ── C3: TTS late-arrival guard ────────────────────────────────────────
   // Reset the "late" flag whenever the beat changes — a fresh beat starts
@@ -393,8 +419,11 @@ export function PlayCanvas({
     if (beat.next.type === "continue") onAdvance();
   }
 
-  const interactive = phase === "ready" && !!imageUrl;
+  const hasRenderableMedia =
+    sceneMedia.kind === "video" || !!sceneMedia.url || !!imageUrl;
+  const interactive = phase === "ready" && hasRenderableMedia;
   const imageClickable =
+    sceneMedia.kind === "image" &&
     interactive &&
     (!typingDone ||
       beat?.next.type === "continue" ||
@@ -435,10 +464,16 @@ export function PlayCanvas({
 
   return (
     <div
-      className={`flex flex-col items-center ${fullViewport ? "w-full h-full justify-center" : "w-full"}`}
+      className={`flex flex-col items-center ${
+        fullViewport
+          ? endOfDemo
+            ? "w-full justify-start"
+            : "w-full h-full justify-center"
+          : "w-full"
+      }`}
     >
       {/* Hidden audio element — voice playback for the current beat */}
-      {audioSrc && (
+      {audioSrc && !videoHasAudio && (
         <audio
           key={audioSrc.slice(-48)}
           ref={audioRef}
@@ -450,9 +485,9 @@ export function PlayCanvas({
         />
       )}
 
-      {imageUrl ? (
+      {hasRenderableMedia ? (
         <div
-          className="relative"
+          className="relative shrink-0"
           style={{ ...canvasStyle, boxShadow: fullViewport ? "none" : SHADOW }}
         >
           {/* The stable wrapper owns the frame size. Keeping overlay geometry
@@ -461,26 +496,39 @@ export function PlayCanvas({
               a short high-entropy slice (matching the <audio> element) so data
               URIs from the gpt-image/mock paths — which can be several MB —
               don't become React's reconciliation key. */}
-          <img
-            key={imageUrl.slice(-48)}
-            ref={imgRef}
-            src={imageUrl}
-            width={intrinsicW}
-            height={intrinsicH}
-            alt={t("play.imageAlt")}
-            onClick={handleImageClick}
-            draggable={false}
-            onLoad={() => {
-              if (!onImageReady) return;
-              const el = imgRef.current;
-              if (!el) { onImageReady(); return; }
-              const notify = () => { if (imgRef.current === el) onImageReady(); };
-              el.decode().then(notify, notify);
-            }}
-            className={`block select-none animate-fade-in transition-opacity duration-700 ease-out ${
+          <SceneMediaCanvas
+            media={sceneMedia}
+            fallbackImageUrl={imageUrl}
+            imageRef={imgRef}
+            intrinsicWidth={intrinsicW}
+            intrinsicHeight={intrinsicH}
+            imageAlt={t("play.imageAlt")}
+            imageClassName={`block select-none animate-fade-in transition-opacity duration-700 ease-out ${
               imageClickable ? "cursor-pointer" : interactive ? "cursor-default" : "cursor-wait"
             } ${dimmed ? "opacity-40" : "opacity-100"}`}
-            style={sizeStyle}
+            imageStyle={sizeStyle}
+            muted={muted}
+            dimmed={dimmed}
+            fallbackSubtitle={
+              beat && displayBody
+                ? {
+                    ...(beat.speaker
+                      ? {
+                          speaker: renderPersonalizedSpeaker(
+                            beat.speaker,
+                            playerName,
+                            defaultPlayerName,
+                            characters,
+                          ),
+                        }
+                      : {}),
+                    text: displayBody,
+                  }
+                : undefined
+            }
+            onImageClick={handleImageClick}
+            onReady={onImageReady}
+            onVideoComplete={(event) => onVideoComplete?.(event)}
           />
 
           {!fullViewport && (
@@ -504,15 +552,26 @@ export function PlayCanvas({
             </div>
           )}
 
-          {beat && (
+          {beat && showBeatOverlay && (
             <div
-              className="absolute inset-0 flex flex-col justify-end pointer-events-none select-none"
+              className={
+                isVideoScene
+                  ? // A8: only the video beat overlay is lifted above the
+                    // player's transport (z-30) / subtitle (z-20) layers and
+                    // becomes its own scrollport. The bottom-aligned inner
+                    // keeps short screens reachable without clipping content.
+                    "absolute inset-0 select-none z-[35] flex flex-col overflow-y-auto overscroll-contain pointer-events-auto"
+                  : // Image scenes keep the original stacking and layout.
+                    "absolute inset-0 flex flex-col justify-end pointer-events-none select-none"
+              }
+              data-video-beat-overlay={isVideoScene ? "true" : undefined}
               style={
                 portrait
                   ? { paddingBottom: "env(safe-area-inset-bottom)" }
                   : undefined
               }
             >
+              <div className={isVideoScene ? "mt-auto w-full" : "contents"}>
               {historyOpen && (
                 <DialogueHistoryModal
                   items={dialogueHistory}
@@ -529,9 +588,16 @@ export function PlayCanvas({
               {choices.length > 0 && (
                 <div
                   className={`pointer-events-auto px-[3%] pb-[1.5%] flex items-stretch ${
-                    portrait
-                      ? "vn-scrollbar flex-col gap-2 max-h-[45dvh] overflow-y-auto"
-                      : "gap-[1.5%]"
+                    // A8: video choices use the overlay's own scrollport, so
+                    // they must not nest another 45dvh scroll area. Image
+                    // scenes keep their original portrait scroll branch.
+                    isVideoScene
+                      ? portrait
+                        ? "flex-col gap-2"
+                        : "gap-[1.5%]"
+                      : portrait
+                        ? "vn-scrollbar flex-col gap-2 max-h-[45dvh] overflow-y-auto"
+                        : "gap-[1.5%]"
                   }`}
                 >
                   {freeformOpen && onFreeformInput ? (
@@ -539,12 +605,12 @@ export function PlayCanvas({
                     <div
                       className="flex-1 flex items-center gap-2"
                       style={{
-                        background: "rgba(20, 14, 8, 0.68)",
-                        border: "1.5px solid rgba(180, 140, 80, 0.65)",
+                        background: "rgba(4, 9, 24, 0.72)",
+                        border: "1.5px solid rgba(97, 129, 255, 0.68)",
                         borderRadius: "6px",
                         backdropFilter: "blur(8px)",
                         WebkitBackdropFilter: "blur(8px)",
-                        boxShadow: "0 2px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(200,165,90,0.12)",
+                        boxShadow: "0 2px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(125,151,255,0.16)",
                         padding: "8px 12px",
                       }}
                     >
@@ -565,8 +631,8 @@ export function PlayCanvas({
                         placeholder={t("play.freeform.placeholder")}
                         maxLength={50}
                         autoFocus
-                        className="flex-1 min-w-0 bg-transparent border-none outline-none font-serif text-[17px] placeholder:text-[rgba(200,185,155,0.50)]"
-                        style={{ color: "rgba(245,235,210,0.95)" }}
+                        className="flex-1 min-w-0 bg-transparent border-none outline-none font-serif text-[17px] placeholder:text-[rgba(196,207,236,0.58)]"
+                        style={{ color: "rgba(245,248,255,0.96)" }}
                       />
                       <button
                         type="button"
@@ -579,7 +645,7 @@ export function PlayCanvas({
                           }
                         }}
                         className="shrink-0 flex items-center justify-center w-8 h-8 rounded-sm transition-colors disabled:opacity-30"
-                        style={{ color: "rgba(195,155,75,0.9)" }}
+                        style={{ color: "rgba(133,158,255,0.96)" }}
                       >
                         <i className="fa-solid fa-paper-plane text-[12px]" />
                       </button>
@@ -587,7 +653,7 @@ export function PlayCanvas({
                         type="button"
                         onClick={() => { setFreeformOpen(false); setFreeformText(""); }}
                         className="shrink-0 flex items-center justify-center w-8 h-8 rounded-sm transition-colors"
-                        style={{ color: "rgba(200,185,155,0.55)" }}
+                        style={{ color: "rgba(196,207,236,0.62)" }}
                       >
                         <i className="fa-solid fa-xmark text-[13px]" />
                       </button>
@@ -616,8 +682,8 @@ export function PlayCanvas({
                           }}
                           className="group shrink-0 flex items-center justify-center transition-all duration-200 disabled:opacity-50 disabled:cursor-wait"
                           style={{
-                            background: "rgba(20, 14, 8, 0.45)",
-                            border: "1.5px dashed rgba(180, 140, 80, 0.40)",
+                            background: "rgba(4, 9, 24, 0.52)",
+                            border: "1.5px dashed rgba(97, 129, 255, 0.48)",
                             borderRadius: "6px",
                             backdropFilter: "blur(8px)",
                             WebkitBackdropFilter: "blur(8px)",
@@ -629,19 +695,19 @@ export function PlayCanvas({
                           <span
                             className="opacity-0 group-hover:opacity-100 absolute inset-0 rounded-[5px] transition-opacity duration-200 pointer-events-none"
                             style={{
-                              background: "rgba(180,140,60,0.08)",
-                              border: "1.5px dashed rgba(200,165,90,0.70)",
+                              background: "rgba(49,91,255,0.12)",
+                              border: "1.5px dashed rgba(125,151,255,0.76)",
                             }}
                           />
                           {portrait ? (
                             <span className="relative flex items-center gap-2">
                               <i
                                 className="fa-solid fa-pen-to-square text-[11px]"
-                                style={{ color: "rgba(195,155,75,0.60)" }}
+                                style={{ color: "rgba(133,158,255,0.72)" }}
                               />
                               <span
                                 className="font-serif text-[16px]"
-                                style={{ color: "rgba(200,185,155,0.70)" }}
+                                style={{ color: "rgba(218,226,248,0.78)" }}
                               >
                                 {t("play.freeform.title")}
                               </span>
@@ -649,7 +715,7 @@ export function PlayCanvas({
                           ) : (
                             <i
                               className="fa-solid fa-pen-to-square text-[12px] relative"
-                              style={{ color: "rgba(195,155,75,0.55)" }}
+                              style={{ color: "rgba(133,158,255,0.68)" }}
                             />
                           )}
                         </button>
@@ -664,25 +730,25 @@ export function PlayCanvas({
                   className="pointer-events-auto mx-[2%] mb-[2%] px-[3%] py-[2.2%] relative"
                   onClick={handleCardClick}
                   style={{
-                    background: "rgba(14, 10, 6, 0.72)",
-                    border: "1.5px solid rgba(175, 138, 72, 0.60)",
+                    background: "rgba(3, 8, 22, 0.76)",
+                    border: "1.5px solid rgba(88, 120, 255, 0.65)",
                     borderRadius: "6px",
                     backdropFilter: "blur(10px)",
                     WebkitBackdropFilter: "blur(10px)",
                     boxShadow:
-                      "0 4px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(200,165,90,0.10)",
+                      "0 4px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(125,151,255,0.14)",
                   }}
                 >
                   <span
                     className="absolute top-[6px] left-[8px] text-[10px] opacity-40 pointer-events-none"
-                    style={{ color: "rgba(195,155,75,1)" }}
+                    style={{ color: "rgba(133,158,255,1)" }}
                     aria-hidden
                   >
                     ✦
                   </span>
                   <span
                     className="absolute top-[6px] right-[8px] text-[10px] opacity-40 pointer-events-none"
-                    style={{ color: "rgba(195,155,75,1)" }}
+                    style={{ color: "rgba(133,158,255,1)" }}
                     aria-hidden
                   >
                     ✦
@@ -693,7 +759,7 @@ export function PlayCanvas({
                       className={`font-serif smallcaps mb-[0.6em] ${
                         portrait ? "text-[16px]" : "text-[14px] md:text-[15px]"
                       }`}
-                      style={{ color: "rgba(205,165,90,0.92)" }}
+                      style={{ color: "rgba(151,174,255,0.96)" }}
                     >
                       {renderPersonalizedSpeaker(beat.speaker, playerName, defaultPlayerName, characters)}
                     </p>
@@ -708,7 +774,7 @@ export function PlayCanvas({
                       className={`font-serif leading-[1.85] mb-[0.6em] ${
                         portrait ? "text-[18px]" : "text-[15px] md:text-[17px]"
                       }`}
-                      style={{ color: "rgba(228,218,196,0.88)" }}
+                      style={{ color: "rgba(224,231,248,0.9)" }}
                     >
                       {renderPersonalizedText(beat.narration, playerName, defaultPlayerName, characters)}
                     </p>
@@ -718,7 +784,7 @@ export function PlayCanvas({
                     className={`font-serif leading-[1.85] ${
                       portrait ? "text-[19px]" : "text-[16px] md:text-[18px]"
                     }`}
-                    style={{ color: "rgba(245,235,210,0.95)" }}
+                    style={{ color: "rgba(245,248,255,0.96)" }}
                   >
                     {typedBody}
                   </p>
@@ -734,7 +800,7 @@ export function PlayCanvas({
                             ? "right-[74px]"
                             : "right-[42px]"
                       } text-[10px] animate-slow-pulse`}
-                      style={{ color: "rgba(195,155,75,0.7)" }}
+                      style={{ color: "rgba(133,158,255,0.8)" }}
                       aria-hidden
                     >
                       ▼
@@ -748,7 +814,7 @@ export function PlayCanvas({
                         e.stopPropagation();
                         onOpenSettings();
                       }}
-                      className="absolute bottom-[6px] right-[8px] flex h-7 w-7 items-center justify-center text-[rgba(195,155,75,0.78)] transition-colors hover:text-[rgba(245,235,210,0.96)]"
+                      className="absolute bottom-[6px] right-[8px] flex h-7 w-7 items-center justify-center text-[rgba(151,174,255,0.86)] transition-colors hover:text-white"
                       aria-label={t("play.tooltips.openSettings")}
                       title={t("home.ui.settings")}
                     >
@@ -765,7 +831,7 @@ export function PlayCanvas({
                       }}
                       className={`absolute bottom-[6px] ${
                         onOpenSettings ? "right-[40px]" : "right-[8px]"
-                      } flex h-7 w-7 items-center justify-center text-[rgba(195,155,75,0.78)] transition-colors hover:text-[rgba(245,235,210,0.96)]`}
+                      } flex h-7 w-7 items-center justify-center text-[rgba(151,174,255,0.86)] transition-colors hover:text-white`}
                       aria-label="风格热切换"
                       title="风格热切换"
                     >
@@ -787,7 +853,7 @@ export function PlayCanvas({
                         : onOpenSettings
                           ? "right-[40px]"
                           : "right-[8px]"
-                    } flex h-7 w-7 items-center justify-center text-[rgba(195,155,75,0.78)] transition-colors hover:text-[rgba(245,235,210,0.96)]`}
+                    } flex h-7 w-7 items-center justify-center text-[rgba(151,174,255,0.86)] transition-colors hover:text-white`}
                     aria-label={t("play.tooltips.openHistory")}
                     title={t("play.tooltips.openHistory")}
                   >
@@ -809,7 +875,7 @@ export function PlayCanvas({
                           : onOpenSettings
                             ? "right-[72px]"
                             : "right-[40px]"
-                      } flex h-7 w-7 items-center justify-center text-[rgba(195,155,75,0.78)] transition-colors hover:text-[rgba(245,235,210,0.96)]`}
+                      } flex h-7 w-7 items-center justify-center text-[rgba(151,174,255,0.86)] transition-colors hover:text-white`}
                       aria-label="角色"
                       title="角色"
                     >
@@ -818,6 +884,7 @@ export function PlayCanvas({
                   )}
                 </div>
               )}
+              </div>
             </div>
           )}
 
@@ -831,7 +898,7 @@ export function PlayCanvas({
             </div>
           )}
 
-          {pendingClick && (
+          {pendingClick && sceneMedia.kind === "image" && (
             <>
               <div
                 className="absolute rounded-full border border-ember-500 pointer-events-none"
@@ -853,9 +920,9 @@ export function PlayCanvas({
                   transform: "translate(-50%, -50%)",
                   width: 11,
                   height: 11,
-                  background: "#D97A2E",
+                  background: "#315BFF",
                   boxShadow:
-                    "0 0 0 3px rgba(251,247,240,0.95), 0 0 14px rgba(217,122,46,0.55)",
+                    "0 0 0 3px rgba(248,250,255,0.96), 0 0 14px rgba(49,91,255,0.58)",
                 }}
               />
             </>
@@ -893,7 +960,7 @@ export function PlayCanvas({
               )}
             </div>
           </div>
-          {/* 加载占位也挂同一对 slot，让右上 / 左上的操作按钮在第一帧就出现 */}
+          {/* 加载中的画面也挂同一对 slot，让右上 / 左上的操作按钮在第一帧就出现 */}
           {!fullViewport && aboveCanvas && (
             <div className="absolute bottom-full right-0 mb-2 flex items-center gap-2">
               {aboveCanvas}
@@ -910,6 +977,42 @@ export function PlayCanvas({
             </div>
           )}
         </div>
+      )}
+
+      {/* Terminal notice: plain in-flow compact card AFTER the scene/dialogue.
+          Deliberately not an overlay — no fixed inset-0, backdrop, dialog role
+          or autofocus — so the final beat and the export controls stay readable
+          instead of being obscured the moment the demo ends. */}
+      {endOfDemo && (
+        <section
+          aria-label={endOfDemo.title}
+          data-play-end-of-demo
+          className="mt-3 w-full max-w-md shrink-0 rounded-lg px-4 py-3 text-left"
+          style={{
+            background: "rgba(3, 8, 22, 0.94)",
+            border: "1px solid rgba(217, 122, 46, 0.45)",
+          }}
+        >
+          <p className="text-[10px] smallcaps text-blue-300/90">
+            {endOfDemo.eyebrow}
+          </p>
+          <p className="mt-1 font-serif text-[13px] font-semibold leading-6 text-cream-50">
+            {endOfDemo.title}
+          </p>
+          <p className="mt-1 font-serif text-[12px] leading-6 text-cream-50/85">
+            {endOfDemo.body}
+          </p>
+          <p className="mt-2 text-[11px] leading-5 text-cream-50/60">
+            {endOfDemo.safetyNote}
+          </p>
+          <a
+            href={endOfDemo.backHref}
+            className="mt-3 inline-flex min-h-8 items-center text-[12px] font-semibold text-blue-300 transition-colors hover:text-blue-200"
+          >
+            <i className="fa-solid fa-arrow-left mr-2 text-[11px]" />
+            {endOfDemo.backLabel}
+          </a>
+        </section>
       )}
 
     </div>

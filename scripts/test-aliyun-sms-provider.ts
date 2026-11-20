@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createHmac } from "node:crypto";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -15,6 +16,7 @@ import {
 } from "@/lib/auth/aliyunSmsProvider";
 import {
   PhoneAuthError,
+  normalizePhone,
   requestPhoneOtp,
   resolveSmsProvider,
   verifyPhoneOtp,
@@ -26,10 +28,19 @@ import {
   listRecentPhoneChallenges,
 } from "@/lib/auth/phoneAuthStore";
 import { POST as requestPhoneRoute } from "@/app/api/auth/phone/request/route";
+import { resolveSmsRequestIp } from "@/lib/auth/trustedClientIp";
+import {
+  authorizePhoneForInviteBeta,
+  PHONE_INVITE_BETA_PHONE_HASH_DOMAIN,
+  PHONE_INVITE_BETA_POLICY_ID,
+  PHONE_REGISTRATION_POLICY_ENV,
+  PHONE_REGISTRATION_POLICY_VALUES,
+} from "@/lib/auth/phoneInviteBetaGate";
 
 const root = await mkdtemp(path.join(os.tmpdir(), "aistory-sms-provider-"));
 const phoneStore = path.join(root, "phone-auth.json");
 const accountStore = path.join(root, "admin.json");
+const inviteAllowlistFile = path.join(root, "phone-invite-beta-v1.json");
 const fixturePhone = "+8613900012345";
 const fixturePhoneDigits = "13900012345";
 const routeFixturePhone = "+8613500056789";
@@ -38,14 +49,38 @@ const fixtureAccessKeyId = "fixture-access-key-id";
 const fixtureAccessKeySecret = "fixture-access-key-secret";
 const fixtureSignName = "测试签名";
 const fixtureTemplateCode = "SMS_TestLogin01";
+const fixturePhonePepper =
+  "fixture-phone-pepper-12345678901234567890";
 
 process.env.AISTORY_PHONE_AUTH_STORE_PATH = phoneStore;
-process.env.AISTORY_PHONE_ID_PEPPER =
-  "fixture-phone-pepper-12345678901234567890";
+process.env.AISTORY_PHONE_ID_PEPPER = fixturePhonePepper;
 process.env.AISTORY_SMS_OTP_SECRET =
   "fixture-otp-secret-1234567890123456789012";
 process.env.AISTORY_USER_SESSION_SECRET =
   "fixture-session-secret-123456789012345678";
+process.env.AISTORY_INVITE_BETA_ENABLED = "true";
+process.env.AISTORY_INVITE_BETA_ALLOWLIST_FILE = inviteAllowlistFile;
+process.env[PHONE_REGISTRATION_POLICY_ENV] =
+  PHONE_REGISTRATION_POLICY_VALUES.inviteOnly;
+
+const invitePhoneHashes = [routeFixturePhone]
+  .map((phone) => createHmac("sha256", fixturePhonePepper)
+    .update(PHONE_INVITE_BETA_PHONE_HASH_DOMAIN)
+    .update("\n")
+    .update(normalizePhone(phone))
+    .digest("hex"))
+  .sort();
+await writeFile(
+  inviteAllowlistFile,
+  JSON.stringify({
+    schemaVersion: 1,
+    policyId: PHONE_INVITE_BETA_POLICY_ID,
+    phoneHashDomain: PHONE_INVITE_BETA_PHONE_HASH_DOMAIN,
+    phoneHashes: invitePhoneHashes,
+  }),
+  { encoding: "utf8", mode: 0o600 },
+);
+if (process.platform !== "win32") await chmod(inviteAllowlistFile, 0o600);
 
 const validEnv = {
   ALIBABA_CLOUD_ACCESS_KEY_ID: fixtureAccessKeyId,
@@ -392,7 +427,7 @@ try {
       body: JSON.stringify({ phone: routeFixturePhone }),
     },
   ));
-  assert.equal(unavailableResponse.status, 503);
+  assert.equal(unavailableResponse.status, 202);
   const unavailableBody = await unavailableResponse.text();
   for (const sensitive of [
     fixturePhone,
@@ -409,6 +444,12 @@ try {
   process.env.AISTORY_LOCAL_SMS_ENABLED = "true";
   process.env.AISTORY_LOCAL_SMS_TEST_CODE = "731946";
   assert.equal(resolveSmsProvider().available, true);
+  assert.equal(
+    (await authorizePhoneForInviteBeta(
+      normalizePhone(routeFixturePhone),
+    )).allowed,
+    true,
+  );
   const lanResponse = await requestPhoneRoute(new Request(
     "http://192.168.1.20:4200/api/auth/phone/request",
     {
@@ -418,10 +459,11 @@ try {
         host: "192.168.1.20:4200",
         origin: "http://192.168.1.20:4200",
       },
-      body: JSON.stringify({ phone: "+8613600045678" }),
+      body: JSON.stringify({ phone: routeFixturePhone }),
     },
   ));
   assert.equal(lanResponse.status, 403);
+  const challengeCountBeforeLoopback = (await readChallenges()).length;
   const loopbackResponse = await requestPhoneRoute(new Request(
     "http://127.0.0.1:4200/api/auth/phone/request",
     {
@@ -431,13 +473,80 @@ try {
         host: "127.0.0.1:4200",
         origin: "http://127.0.0.1:4200",
       },
-      body: JSON.stringify({ phone: "+8613600045678" }),
+      body: JSON.stringify({ phone: routeFixturePhone }),
     },
   ));
   assert.equal(loopbackResponse.status, 202);
-  const loopbackBody = await loopbackResponse.text();
-  assert.equal(loopbackBody.includes("731946"), false);
-  assert.equal(loopbackBody.includes("13600045678"), false);
+  const loopbackBody = await loopbackResponse.json() as {
+    challengeId?: string;
+    retryAfterSeconds?: number;
+  };
+  assert.match(loopbackBody.challengeId || "", /^[0-9a-f-]{36}$/);
+  assert.equal(loopbackBody.retryAfterSeconds, 60);
+  const loopbackJson = JSON.stringify(loopbackBody);
+  assert.equal(loopbackJson.includes("731946"), false);
+  assert.equal(loopbackJson.includes(routeFixturePhone), false);
+  const limitedResponse = await requestPhoneRoute(new Request(
+    "http://127.0.0.1:4200/api/auth/phone/request",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        host: "127.0.0.1:4200",
+        origin: "http://127.0.0.1:4200",
+      },
+      body: JSON.stringify({ phone: routeFixturePhone }),
+    },
+  ));
+  assert.equal(limitedResponse.status, 202);
+  const limitedBody = await limitedResponse.json() as {
+    challengeId?: string;
+    code?: string;
+    retryAfterSeconds?: number;
+  };
+  assert.equal(limitedBody.code, undefined);
+  assert.equal(limitedBody.retryAfterSeconds, 60);
+  assert.match(limitedBody.challengeId || "", /^[0-9a-f-]{36}$/);
+  assert.notEqual(limitedBody.challengeId, loopbackBody.challengeId);
+  assert.equal(limitedResponse.headers.get("retry-after"), null);
+  assert.equal(
+    (await readChallenges()).length,
+    challengeCountBeforeLoopback + 1,
+    "an enumeration-safe cooldown receipt must not persist a decoy challenge",
+  );
+
+  assert.equal(
+    resolveSmsRequestIp(new Headers({
+      "x-forwarded-for": "198.51.100.20, 203.0.113.8",
+      "x-real-ip": "192.0.2.44",
+    }), false),
+    "direct-client",
+  );
+  assert.equal(
+    resolveSmsRequestIp(new Headers({
+      "x-forwarded-for": "198.51.100.20, 203.0.113.8",
+      "x-real-ip": "192.0.2.44",
+    }), true),
+    "192.0.2.44",
+  );
+  assert.equal(
+    resolveSmsRequestIp(new Headers({
+      "x-forwarded-for": "198.51.100.20, 203.0.113.8",
+      "x-real-ip": "forged-value",
+    }), true),
+    "203.0.113.8",
+  );
+  assert.equal(
+    resolveSmsRequestIp(new Headers({
+      "x-forwarded-for": "forged-value, also-invalid",
+      "x-real-ip": "not-an-ip",
+    }), true),
+    "trusted-proxy-invalid",
+  );
+  assert.equal(
+    resolveSmsRequestIp(new Headers({ "x-real-ip": "2001:db8::1" }), true),
+    "2001:db8::1",
+  );
 
   const persisted = `${await readFile(phoneStore, "utf8")}\n${
     await readFile(accountStore, "utf8")

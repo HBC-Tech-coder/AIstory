@@ -2,6 +2,7 @@ export type CreatorStudioModuleId =
   | "aistory-script"
   | "local-generation"
   | "case-review"
+  | "steam-video-plan"
   | "projects"
   | "production"
   | "characters"
@@ -49,6 +50,15 @@ export const CREATOR_STUDIO_MODULES: readonly CreatorStudioModuleDefinition[] = 
     shortLabel: "审片",
     description: "审核案例候选图片与视频；审核结论不会自动发布到公开作品。",
     icon: "fa-film",
+    source: "aistory",
+    requiresProject: false,
+  },
+  {
+    id: "steam-video-plan",
+    label: "Steam 首发视频计划",
+    shortLabel: "视频计划",
+    description: "从权威公开剧情图派生只读生产批次，不提交模型、审核或发布。",
+    icon: "fa-list-ol",
     source: "aistory",
     requiresProject: false,
   },
@@ -128,9 +138,9 @@ export const CREATOR_STUDIO_MODULES: readonly CreatorStudioModuleDefinition[] = 
     id: "models",
     label: "模型配置",
     shortLabel: "模型",
-    description: "配置本地生产模型；密钥由原系统安全边界管理。",
+    description: "管理 AIstory 本地 ComfyUI workflow 注册版本；不会运行模型。",
     icon: "fa-sliders",
-    source: "localminidrama",
+    source: "aistory",
     requiresProject: false,
   },
 ] as const;
@@ -165,12 +175,13 @@ export function resolveCreatorStudioModuleUrl(
   const definition = CREATOR_STUDIO_MODULES.find((item) => item.id === moduleId);
 
   if (moduleId === "media") return { url: `${base}/media-library`, needsProject: false };
-  if (moduleId === "models") return { url: `${base}/ai-config`, needsProject: false };
   if (moduleId === "projects") return { url: `${base}/`, needsProject: false };
   if (
     moduleId === "aistory-script"
     || moduleId === "local-generation"
     || moduleId === "case-review"
+    || moduleId === "steam-video-plan"
+    || moduleId === "models"
   ) {
     return { url: "", needsProject: false };
   }

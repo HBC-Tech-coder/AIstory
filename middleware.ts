@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { LINGHAO_PASSPORT_V4_PRODUCT_SESSION_COOKIE } from "./lib/auth/linghaoPassportV4ProductionCookies";
 
 // Locale prefixes that appear in the URL (default zh-CN has no prefix).
 const LOCALE_PREFIXES = ["en", "ja"] as const;
@@ -18,9 +19,9 @@ function detectLocaleFromPath(pathname: string): { locale: string; stripped: str
 // Next.js 16 deprecated `middleware` in favor of `proxy`, but `proxy` is locked
 // to the Node.js runtime. OpenNext for Cloudflare rejects Node.js middleware at
 // build time ("Node.js middleware is not currently supported"), so we keep the
-// `middleware` convention with an explicit edge runtime to stay deployable to
-// both Vercel and Cloudflare Workers. Revisit once OpenNext supports Node.js
-// middleware or `proxy` allows the edge runtime.
+// `middleware` convention, which itself selects the Edge runtime. Do not export
+// the retired `experimental-edge` runtime value: Next 16 repeatedly re-analyzes
+// it in development. Revisit once OpenNext supports Node.js proxy execution.
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -33,7 +34,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/home/") ||
     pathname.startsWith("/docs/") ||
-    /\.(?:svg|png|jpe?g|gif|webp|avif|ico|css|js|mjs|woff2?|ttf|otf|json|xml|txt|map)$/i.test(pathname);
+    /\.(?:svg|png|jpe?g|gif|webp|avif|ico|css|js|mjs|woff2?|ttf|otf|json|xml|txt|map|mp4|webm|mp3|m4a|wav|ogg|vtt)$/i.test(pathname);
 
   let locale = DEFAULT_LOCALE;
   let response: NextResponse;
@@ -53,8 +54,12 @@ export async function middleware(request: NextRequest) {
       locale = detected.locale;
       response = NextResponse.next({ request });
     } else {
-      // No locale prefix — rewrite to /zh-CN/... internally (URL stays clean).
-      const url = request.nextUrl.clone();
+      // Preserve Next's original origin so this stays an internal rewrite.
+      // nextUrl.clone() normalizes 127.0.0.1 to localhost, which can turn an
+      // HTTPS-forwarded request into a TLS proxy call to an HTTP-only listener.
+      // Paired with skipProxyUrlNormalize in next.config; never derive an origin
+      // from Host/forwarded headers or downgrade the external HTTPS protocol.
+      const url = new URL(request.url);
       url.pathname = `/${DEFAULT_LOCALE}${pathname}`;
       response = NextResponse.rewrite(url);
     }
@@ -67,7 +72,26 @@ export async function middleware(request: NextRequest) {
   response.headers.set("x-locale", locale);
   response.headers.set("x-pathname", pathname);
 
+  // The default-off Linghao Passport v4 local test surface owns only these
+  // exact paths. Preserve the locale/pathname response headers above and never
+  // branch on cookie presence for an arbitrary request.
+  if (
+    pathname.startsWith("/api/auth/linghao-passport-v4/") ||
+    pathname === "/auth/linghao-passport-v4"
+  ) {
+    return response;
+  }
+
   // ── Supabase auth token refresh ────────────────────────────────────
+  // AIUser owns these exact independent auth boundaries, including their disabled path.
+  // Never refresh or map a legacy Supabase session as an OIDC side effect.
+  if (pathname === "/api/auth/aiuser/start" || pathname === "/api/auth/aiuser/callback") return response;
+  if (pathname.startsWith("/api/auth/aiuser/") || pathname === "/auth/aiuser"
+    || request.cookies.has("__Host-aistory_aiuser_user_v1")) return response;
+  // A present Passport product cookie owns identity resolution even when it is
+  // stale, malformed, or the production gate is unavailable. Never refresh a
+  // legacy Supabase session that the request is not allowed to fall through to.
+  if (request.cookies.has(LINGHAO_PASSPORT_V4_PRODUCT_SESSION_COOKIE)) return response;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!supabaseUrl || !supabaseKey) return response;
@@ -97,7 +121,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.svg|.*\\.(?:svg|png|jpe?g|gif|webp|avif|ico|css|js|mjs|woff2?|ttf|otf|html|xml|txt|map)).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|.*\\.(?:svg|png|jpe?g|gif|webp|avif|ico|css|js|mjs|woff2?|ttf|otf|html|xml|txt|map|mp4|webm|mp3|m4a|wav|ogg|vtt)).*)",
   ],
-  runtime: "experimental-edge",
 };

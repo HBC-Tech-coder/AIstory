@@ -1,8 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AdminVideoAssetsPanel } from "@/components/AdminVideoAssetsPanel";
+import { AdminVideoStoryComposer } from "@/components/AdminVideoStoryComposer";
+import { AdminVideoWorkflowABPanel } from "@/components/AdminVideoWorkflowABPanel";
+import { AdminGpuCoordinatorPanel } from "@/components/AdminGpuCoordinatorPanel";
+import { AdminRoleManagementPanel } from "@/components/AdminRoleManagementPanel";
 import type {
-  AdminActor,
+  AdminActorPublic,
   AdminSnapshot,
   PriceCatalogEntry,
   PaymentProvider,
@@ -13,6 +18,7 @@ import type {
 type Tab =
   | "overview"
   | "users"
+  | "roles"
   | "credits"
   | "analytics"
   | "payments"
@@ -20,11 +26,16 @@ type Tab =
   | "branding"
   | "domains"
   | "channels"
+  | "videos"
+  | "video-ab"
+  | "video-stories"
+  | "gpu-coordinator"
   | "audit";
 
 const NAV: Array<{ id: Tab; label: string; icon: string }> = [
   { id: "overview", label: "总览", icon: "fa-chart-pie" },
   { id: "users", label: "用户管理", icon: "fa-users" },
+  { id: "roles", label: "角色清单", icon: "fa-user-shield" },
   { id: "credits", label: "积分中心", icon: "fa-coins" },
   { id: "analytics", label: "行为与成本", icon: "fa-chart-line" },
   { id: "integrations", label: "平台集成", icon: "fa-plug" },
@@ -32,6 +43,10 @@ const NAV: Array<{ id: Tab; label: string; icon: string }> = [
   { id: "branding", label: "平台与品牌", icon: "fa-palette" },
   { id: "domains", label: "域名", icon: "fa-globe" },
   { id: "channels", label: "白标与渠道", icon: "fa-diagram-project" },
+  { id: "videos", label: "视频资产", icon: "fa-film" },
+  { id: "video-ab", label: "A/B 视频实验", icon: "fa-scale-balanced" },
+  { id: "video-stories", label: "互动视频剧情", icon: "fa-code-branch" },
+  { id: "gpu-coordinator", label: "GPU LAN LAB", icon: "fa-microchip" },
   { id: "audit", label: "审计中心", icon: "fa-shield-halved" },
 ];
 
@@ -84,7 +99,7 @@ export function AdminConsole({
   actor,
 }: {
   initialSnapshot: AdminSnapshot;
-  actor: AdminActor;
+  actor: AdminActorPublic;
 }) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [tab, setTab] = useState<Tab>("overview");
@@ -151,8 +166,23 @@ export function AdminConsole({
       ].some((value) => value.toLowerCase().includes(query)),
     );
   }, [snapshot.users, userQuery]);
+  // The read-only role inventory is exposed only through the non-independent
+  // super-admin path; the independent P0.5 actor keeps an empty roles projection.
+  const canViewRoleInventory = actor.mode !== "independent"
+    && actor.roles.includes("super_admin");
+  const visibleNavigation = NAV.filter((item) => {
+    if (item.id === "roles") return canViewRoleInventory;
+    if (actor.mode === "independent") {
+      return item.id === "overview" || item.id === "users";
+    }
+    return true;
+  });
 
   async function act(body: Record<string, unknown>) {
+    if (actor.mode === "independent") {
+      setMessage("独立管理员当前仅开放只读控制台投影。");
+      return;
+    }
     setBusy(true);
     setMessage("");
     const response = await fetch("/api/admin/actions", {
@@ -160,6 +190,10 @@ export function AdminConsole({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    if (response.status === 401 || response.status === 403) {
+      window.location.assign("/admin/login?state=session-ended");
+      return;
+    }
     const result = await response.json() as {
       error?: string;
       snapshot?: AdminSnapshot;
@@ -174,17 +208,25 @@ export function AdminConsole({
   }
 
   async function logout() {
-    await fetch("/api/admin/session", { method: "DELETE" });
-    window.location.assign("/admin/login");
+    const response = await fetch("/api/admin/session", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    window.location.assign(
+      response.ok
+        ? "/admin/login"
+        : "/admin/login?state=session-ended",
+    );
   }
 
   const overview = snapshot.overview;
   return (
-    <main className="min-h-screen bg-[#F5F0E7] text-stone-900">
-      <header className="sticky top-0 z-20 border-b border-stone-200 bg-[#F5F0E7]/95 px-4 py-3 backdrop-blur md:px-7">
+    <main className="ui-page min-h-screen text-stone-900">
+      <header className="ui-surface sticky top-0 z-20 border-b px-4 py-3 backdrop-blur md:px-7">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#8A5A2B] font-serif text-xl text-white">
+            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-ember-500 font-serif text-xl text-white">
               A
             </div>
             <div className="min-w-0">
@@ -194,8 +236,14 @@ export function AdminConsole({
           </div>
           <div className="flex items-center gap-3">
             <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-900 sm:px-3 sm:text-xs">
-              <span className="sm:hidden">本地数据</span>
-              <span className="hidden sm:inline">本地开发数据</span>
+              {actor.mode === "independent" ? (
+                <span>生产安全只读</span>
+              ) : (
+                <>
+                  <span className="sm:hidden">本地数据</span>
+                  <span className="hidden sm:inline">本地开发数据</span>
+                </>
+              )}
             </span>
             <button
               type="button"
@@ -211,14 +259,14 @@ export function AdminConsole({
       <div className="mx-auto grid max-w-[1600px] md:grid-cols-[230px_minmax(0,1fr)]">
         <aside className="border-b border-stone-200 bg-white/50 p-3 md:min-h-[calc(100vh-65px)] md:border-b-0 md:border-r md:p-4">
           <nav className="flex gap-2 overflow-x-auto pb-1 md:block md:space-y-1">
-            {NAV.map((item) => (
+            {visibleNavigation.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setTab(item.id)}
                 className={`flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition md:w-full ${
                   tab === item.id
-                    ? "bg-[#8A5A2B] text-white"
+                    ? "bg-ember-500 text-white"
                     : "text-stone-600 hover:bg-white hover:text-stone-900"
                 }`}
               >
@@ -228,9 +276,11 @@ export function AdminConsole({
             ))}
           </nav>
           <div className="mt-6 hidden rounded-xl border border-stone-200 bg-white p-3 text-xs leading-5 text-stone-500 md:block">
-            <p className="font-medium text-stone-700">{actor.userId}</p>
+            <p className="font-medium text-stone-700">
+              {actor.mode === "independent" ? "独立管理员" : "管理员会话"}
+            </p>
             <p>{actor.roles.join(" / ")}</p>
-            <p className="mt-2">此环境没有真实注册用户、订单或支付连接。</p>
+            <p className="mt-2">此视图仅显示当前授权范围内的安全摘要。</p>
           </div>
         </aside>
 
@@ -285,7 +335,7 @@ export function AdminConsole({
                 value={userQuery}
                 onChange={(event) => setUserQuery(event.target.value)}
                 placeholder="搜索用户、状态、类型、地区或渠道"
-                className="w-full max-w-xl rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm outline-none focus:border-[#8A5A2B]"
+                className="w-full max-w-xl rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm outline-none focus:border-ember-500"
               />
               {snapshot.users.length ? (
                 <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
@@ -392,7 +442,7 @@ export function AdminConsole({
                     <button
                       type="submit"
                       disabled={busy || !creditUserId}
-                      className="rounded-xl bg-[#8A5A2B] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                      className="rounded-xl bg-ember-500 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
                     >
                       追加积分流水
                     </button>
@@ -471,7 +521,7 @@ export function AdminConsole({
                     <button
                       type="submit"
                       disabled={busy}
-                      className="rounded-xl bg-[#8A5A2B] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50 sm:col-span-2"
+                      className="rounded-xl bg-ember-500 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50 sm:col-span-2"
                     >
                       保存版本化定价策略
                     </button>
@@ -557,7 +607,7 @@ export function AdminConsole({
                       },
                       reason: "更新平台模型集成元数据",
                     })}
-                    className="rounded-xl bg-[#8A5A2B] px-4 py-2.5 text-sm text-white disabled:opacity-50 md:col-span-2"
+                    className="rounded-xl bg-ember-500 px-4 py-2.5 text-sm text-white disabled:opacity-50 md:col-span-2"
                   >
                     保存为停用配置
                   </button>
@@ -639,7 +689,7 @@ export function AdminConsole({
                       },
                       reason: "更新支付沙盒配置元数据",
                     })}
-                    className="rounded-xl bg-[#8A5A2B] px-4 py-2.5 text-sm text-white disabled:opacity-50"
+                    className="rounded-xl bg-ember-500 px-4 py-2.5 text-sm text-white disabled:opacity-50"
                   >
                     保存元数据
                   </button>
@@ -675,7 +725,7 @@ export function AdminConsole({
                           ...branding,
                           [key]: event.target.value,
                         })}
-                        className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-2.5 outline-none focus:border-[#8A5A2B]"
+                        className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-2.5 outline-none focus:border-ember-500"
                       />
                     </label>
                   ))}
@@ -697,7 +747,7 @@ export function AdminConsole({
                           ...branding,
                           [key]: event.target.value,
                         })}
-                        className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-2.5 outline-none focus:border-[#8A5A2B]"
+                        className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-2.5 outline-none focus:border-ember-500"
                       />
                     </label>
                   ))}
@@ -711,7 +761,7 @@ export function AdminConsole({
                         ...branding,
                         defaultInitialCredits: Number(event.target.value),
                       })}
-                      className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-2.5 outline-none focus:border-[#8A5A2B]"
+                      className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-2.5 outline-none focus:border-ember-500"
                     />
                   </label>
                   <div className="flex items-end">
@@ -719,7 +769,7 @@ export function AdminConsole({
                       type="button"
                       disabled={busy}
                       onClick={() => act({ action: "branding.preview", branding })}
-                      className="w-full rounded-xl bg-[#8A5A2B] px-4 py-2.5 text-white disabled:opacity-50"
+                      className="w-full rounded-xl bg-ember-500 px-4 py-2.5 text-white disabled:opacity-50"
                     >
                       保存预览版本
                     </button>
@@ -751,7 +801,7 @@ export function AdminConsole({
                           versionId: latestDraft.id,
                           reason: publishReason,
                         })}
-                        className="w-full rounded-xl border border-[#8A5A2B] px-4 py-2.5 text-[#8A5A2B] disabled:opacity-40"
+                        className="w-full rounded-xl border border-ember-500 px-4 py-2.5 text-ember-500 disabled:opacity-40"
                       >
                         发布此版本
                       </button>
@@ -785,7 +835,7 @@ export function AdminConsole({
                     },
                     reason: "登记待验证域名",
                   })}
-                  className="rounded-xl bg-[#8A5A2B] px-4 py-2.5 text-white disabled:opacity-50"
+                  className="rounded-xl bg-ember-500 px-4 py-2.5 text-white disabled:opacity-50"
                 >
                   保存待验证绑定
                 </button>
@@ -856,7 +906,7 @@ export function AdminConsole({
                     },
                     reason: "创建本地渠道草稿",
                   })}
-                  className="rounded-xl bg-[#8A5A2B] px-4 py-2.5 text-white disabled:opacity-50"
+                  className="rounded-xl bg-ember-500 px-4 py-2.5 text-white disabled:opacity-50"
                 >
                   新建草稿
                 </button>
@@ -874,6 +924,12 @@ export function AdminConsole({
               )}
             </div>
           ) : null}
+
+          {tab === "videos" ? <AdminVideoAssetsPanel /> : null}
+          {tab === "video-ab" ? <AdminVideoWorkflowABPanel /> : null}
+          {tab === "video-stories" ? <AdminVideoStoryComposer /> : null}
+          {tab === "gpu-coordinator" ? <AdminGpuCoordinatorPanel /> : null}
+          {tab === "roles" && canViewRoleInventory ? <AdminRoleManagementPanel /> : null}
 
           {tab === "audit" ? (
             <div className="space-y-5">

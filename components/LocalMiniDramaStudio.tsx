@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { getFeaturedTemplate } from "@/lib/featuredStories";
 import type {
   DreamFrameBranchDraft,
@@ -465,7 +466,7 @@ export function LocalMiniDramaStudio({
 } = {}) {
   const fileRef = useRef<HTMLInputElement>(null);
   const thumbnailRef = useRef<HTMLInputElement>(null);
-  const [theme, setTheme] = useState<"night" | "day">("night");
+  const [theme, setTheme] = useState<"night" | "day">("day");
   const [scriptText, setScriptText] = useState(DEFAULT_SCRIPT);
   const [customThumbnail, setCustomThumbnail] = useState(false);
   const [settings, setSettings] = useState<StudioSettings>({
@@ -505,14 +506,14 @@ export function LocalMiniDramaStudio({
 
   const shell = theme === "night"
     ? "bg-[#0c1110] text-[#e9dec8]"
-    : "bg-[#f7f1e5] text-[#2d1810]";
+    : "ui-page";
   const panel = theme === "night"
     ? "border-[#31403b] bg-[#121a18]"
-    : "border-clay-900/15 bg-cream-50";
+    : "ui-surface";
   const muted = theme === "night" ? "text-[#b7aa92]" : "text-clay-600";
   const inputClass = theme === "night"
     ? "border-[#35463f] bg-[#0f1514] text-[#f3ead6] placeholder:text-[#837966]"
-    : "border-clay-900/15 bg-white/70 text-clay-900 placeholder:text-clay-400";
+    : "ui-input";
 
   const branchScore = useMemo(() => {
     const episodeCount = draft.episodes.length || 1;
@@ -809,21 +810,21 @@ export function LocalMiniDramaStudio({
   }
 
   return (
-    <main className={`min-h-screen ${shell}`}>
+    <main className={`min-h-screen ${shell} ${theme === "night" ? "aistory-night" : ""}`}>
       <div className="mx-auto flex min-h-screen w-full max-w-[1720px] flex-col px-5 py-5 md:px-8">
         <header className={`flex flex-wrap items-center justify-between gap-4 border ${panel} px-5 py-4`}>
           <div className="flex items-center gap-4">
-            <a
+            <Link
               href="/"
               className={`inline-flex h-11 w-11 items-center justify-center border ${theme === "night" ? "border-[#5e5338] text-[#d7b35f]" : "border-clay-900/20 text-ember-500"}`}
               aria-label="返回首页"
               title="返回首页"
             >
               <i className="fa-solid fa-house" />
-            </a>
+            </Link>
             <div>
               <div className="font-serif text-2xl leading-none md:text-[32px]">
-                AIstory <em className="text-[#d7b35f]">DreamFrame</em>
+                AIstory <em className="text-ember-500">DreamFrame</em>
               </div>
               <div className={`mt-1 text-xs ${muted}`}>专业编辑 / LocalMiniDrama Bridge</div>
             </div>
@@ -957,7 +958,7 @@ export function LocalMiniDramaStudio({
                 <button
                   type="button"
                   onClick={parseScript}
-                  className="inline-flex items-center gap-2 bg-[#d9b765] px-5 py-3 font-semibold text-[#1a1610] hover:bg-[#e6c979]"
+                  className="inline-flex items-center gap-2 bg-ember-500 px-5 py-3 font-semibold text-cream-50 hover:bg-[rgb(var(--ui-primary-hover))]"
                 >
                   <i className="fa-solid fa-wand-magic-sparkles" />
                   解析并填写
@@ -975,7 +976,7 @@ export function LocalMiniDramaStudio({
                   type="button"
                   onClick={() => void createDrama()}
                   disabled={loading}
-                  className="ml-auto inline-flex items-center gap-2 bg-[#d9b765] px-5 py-3 font-semibold text-[#1a1610] hover:bg-[#e6c979] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="ml-auto inline-flex items-center gap-2 bg-ember-500 px-5 py-3 font-semibold text-cream-50 hover:bg-[rgb(var(--ui-primary-hover))] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <i className={`fa-solid ${loading ? "fa-spinner animate-spin" : "fa-clapperboard"}`} />
                   创建短剧草稿
@@ -985,12 +986,12 @@ export function LocalMiniDramaStudio({
               {created && (
                 <div className={`grid gap-3 border p-4 md:grid-cols-2 ${theme === "night" ? "border-[#40524c] bg-[#0f1514]" : "border-clay-900/15 bg-white/60"}`}>
                   {onOpenWorkspace ? (
-                    <button type="button" onClick={() => onOpenWorkspace(created.drama.id, "production")} className="inline-flex items-center justify-center gap-2 bg-[#d9b765] px-4 py-3 font-semibold text-[#1a1610]">
+                    <button type="button" onClick={() => onOpenWorkspace(created.drama.id, "production")} className="inline-flex items-center justify-center gap-2 bg-ember-500 px-4 py-3 font-semibold text-cream-50">
                       <i className="fa-solid fa-list-check" />
                       进入统一制作台
                     </button>
                   ) : (
-                    <a href={created.detailUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 bg-[#d9b765] px-4 py-3 font-semibold text-[#1a1610]">
+                    <a href={created.detailUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 bg-ember-500 px-4 py-3 font-semibold text-cream-50">
                       <i className="fa-solid fa-list-check" />
                       剧集管理
                     </a>
@@ -1050,7 +1051,7 @@ export function LocalMiniDramaStudio({
                   type="checkbox"
                   checked={settings.adaptiveCrossFormat}
                   onChange={(event) => updateSettings({ adaptiveCrossFormat: event.target.checked })}
-                  className="h-4 w-4 accent-[#d9b765]"
+                  className="h-4 w-4 accent-ember-500"
                 />
                 <span>跨端画风跟随：如果横屏或竖屏某一端数据更好，另一端补生成时尽量贴近高赞端画风。</span>
               </label>
@@ -1068,7 +1069,7 @@ export function LocalMiniDramaStudio({
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="font-serif text-xl">LocalMiniDrama 最近项目</h3>
                 {status?.frontendUrl && (
-                  <a href={status.frontendUrl} target="_blank" rel="noreferrer" className={`text-sm ${muted} hover:text-[#d9b765]`}>
+                  <a href={status.frontendUrl} target="_blank" rel="noreferrer" className={`text-sm ${muted} hover:text-ember-500`}>
                     打开原界面
                   </a>
                 )}
@@ -1086,7 +1087,7 @@ export function LocalMiniDramaStudio({
                       {drama.thumbnail ? (
                         <img src={drama.thumbnail} alt="" className="h-12 w-10 shrink-0 object-cover" />
                       ) : (
-                        <span className="flex h-12 w-10 shrink-0 items-center justify-center bg-[#d9b765]/20 text-[#d9b765]">
+                        <span className="flex h-12 w-10 shrink-0 items-center justify-center bg-ember-500/20 text-ember-500">
                           <i className="fa-solid fa-clapperboard" />
                         </span>
                       )}
@@ -1115,7 +1116,7 @@ export function LocalMiniDramaStudio({
                         {item.thumbnail ? (
                           <img src={item.thumbnail} alt="" className="h-12 w-10 shrink-0 object-cover" />
                         ) : (
-                          <span className="flex h-12 w-10 shrink-0 items-center justify-center bg-[#d9b765]/20 text-[#d9b765]">
+                          <span className="flex h-12 w-10 shrink-0 items-center justify-center bg-ember-500/20 text-ember-500">
                             <i className="fa-solid fa-file-pen" />
                           </span>
                         )}
@@ -1128,7 +1129,7 @@ export function LocalMiniDramaStudio({
                       </span>
                       <span className={`shrink-0 text-right ${muted}`}>
                         {formatDate(item.updatedAt)}
-                        <span className="mt-1 block text-xs text-[#d9b765]">打开</span>
+                        <span className="mt-1 block text-xs text-ember-500">打开</span>
                       </span>
                     </button>
                   ))}
@@ -1162,7 +1163,7 @@ export function LocalMiniDramaStudio({
               {draft.episodes.map((episode, index) => (
                 <div key={index} className={`border p-3 ${theme === "night" ? "border-[#35463f] bg-[#0f1514]" : "border-clay-900/15 bg-white/60"}`}>
                   <div className="mb-2 flex items-center gap-2">
-                    <span className="inline-flex h-8 w-10 items-center justify-center bg-[#d9b765] text-sm font-semibold text-[#1a1610]">{episode.episode_number}</span>
+                    <span className="inline-flex h-8 w-10 items-center justify-center bg-ember-500 text-sm font-semibold text-cream-50">{episode.episode_number}</span>
                     <input
                       value={episode.title}
                       onChange={(event) => updateEpisode(index, { title: event.target.value })}

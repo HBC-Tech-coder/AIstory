@@ -69,7 +69,12 @@ async function callLocalMiniDrama<T>(
   init: RequestInit = {},
   fetcher: typeof fetch = fetch,
 ): Promise<T> {
-  const { backendUrl } = getLocalMiniDramaConfig();
+  const { backendUrl, frontendUrl } = getLocalMiniDramaConfig();
+  if (!isLoopbackServiceUrl(backendUrl) || !isLoopbackServiceUrl(frontendUrl)) {
+    throw new Error(
+      "LocalMiniDrama calls are restricted to configured loopback services.",
+    );
+  }
   const apiPath = path.startsWith("/") ? path : `/${path}`;
   const response = await fetcher(`${backendUrl}/api/v1${apiPath}`, {
     ...init,
@@ -196,6 +201,14 @@ function normalizeDraft(draft: DreamFrameMiniDramaDraft): DreamFrameMiniDramaDra
 
 export async function getLocalMiniDramaStatus(): Promise<LocalMiniDramaStatus> {
   const { backendUrl, frontendUrl } = getLocalMiniDramaConfig();
+  if (!isLoopbackServiceUrl(backendUrl) || !isLoopbackServiceUrl(frontendUrl)) {
+    return {
+      ok: false,
+      backendUrl,
+      frontendUrl,
+      message: "LocalMiniDrama status is restricted to loopback services.",
+    };
+  }
   try {
     const response = await fetch(`${backendUrl}/health`, {
       cache: "no-store",

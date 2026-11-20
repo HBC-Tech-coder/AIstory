@@ -1,0 +1,33 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false
+  },
+  "include": [
+    "next-env.d.ts",
+    "cloudflare-env.d.ts",
+    "lib/steam/productionPlan.ts",
+    "lib/steam/productionPlanServer.ts",
+    "lib/steam/productionSpec.ts",
+    "lib/steam/productionSpecPublic.ts",
+    "lib/steam/productionSpecServer.ts",
+    "lib/steam/releaseContent.ts",
+    "components/SteamVideoProductionPlanPanel.tsx",
+    "components/SteamVideoGenerationPreflightPanel.tsx",
+    "components/CreatorStudioShell.tsx",
+    "lib/creator-studio/capabilities.ts",
+    "app/api/steam/video-production-plan/route.ts",
+    "app/api/steam/video-generation-preflight/route.ts",
+    "app/[locale]/studio/page.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "scripts",
+    "experiments",
+    ".tmp",
+    "app/app",
+    "components/components",
+    "lib/lib"
+  ]
+}

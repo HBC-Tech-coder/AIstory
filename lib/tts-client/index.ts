@@ -1,4 +1,5 @@
-﻿import type { CharacterVoice, TtsConfig, TtsProvider } from "@infiplot/types";
+import type { CharacterVoice, TtsConfig, TtsProvider } from "@infiplot/types";
+import { assertPlatformTtsVoiceBinding } from "../billing/platformCostEnvelope";
 import {
   formatStepfunCatalogForPrompt,
   getStepfunPresetVoiceGender,
@@ -64,6 +65,14 @@ export async function synthesize(
   delivery?: string,
   signal?: AbortSignal,
 ): Promise<{ audioBase64: string; mimeType: string }> {
+  // Platform scope: reject any voice that does not match the bound Bailian
+  // config BEFORE dispatch, so a provider mismatch cannot fall through to the
+  // unwrapped Xiaomi/StepFun adapters and escape the request budget.
+  assertPlatformTtsVoiceBinding(
+    cfg,
+    voice.provider,
+    (voice as { model?: string }).model,
+  );
   if (voice.provider === "bailian") {
     return bailianSynthesize(cfg, voice, text, delivery, signal);
   }

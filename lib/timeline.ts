@@ -8,6 +8,7 @@ import type {
   TimelineDecision,
   TimelineState,
 } from "@infiplot/types";
+import { scenePosterUrl } from "./sceneMedia";
 import { stableHash } from "@/lib/speculativeBranch";
 
 function clone<T>(value: T): T {
@@ -108,7 +109,7 @@ export function recordTimelineDecision(
     beatId: beat.id,
     createdAt: Date.now(),
     question: beat.line || beat.narration,
-    sceneThumbnailUrl: scene.imageUrl,
+    sceneThumbnailUrl: scenePosterUrl(scene),
     choices: clone(beat.next.type === "choice" ? beat.next.choices : []),
     selectedChoiceId: selectedChoice.id,
     checkpoint,
@@ -284,7 +285,7 @@ export function migrateLegacyDecisions(session: Session): TimelineDecision[] {
       beatId: beat.id,
       createdAt: session.createdAt,
       question: beat.line || beat.narration,
-      sceneThumbnailUrl: entry.scene.imageUrl,
+      sceneThumbnailUrl: scenePosterUrl(entry.scene),
       choices: clone(beat.next.choices),
       selectedChoiceId,
       isKeyDecision: true,

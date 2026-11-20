@@ -177,7 +177,10 @@ async function synthesizeBeatForExport(
   if (!speaker.voice) return null;
   const res = await fetch("/api/beat-audio", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-Idempotency-Key": `generation:${crypto.randomUUID()}`,
+    },
     body: JSON.stringify({
       beat: { id: beat.id, line: speechLine, lineDelivery: beat.lineDelivery },
       voice: speaker.voice,

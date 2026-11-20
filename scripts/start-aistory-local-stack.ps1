@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
   [switch]$StatusOnly,
+  [switch]$AllowLanBinding,
   [ValidateRange(1, 120)]
   [int]$WaitSeconds = 30
 )
@@ -16,9 +17,23 @@ $taskPathValue = [Environment]::GetEnvironmentVariable("Path", "Process")
 
 $aiStoryRoot = "D:\AIstory"
 $localMiniDramaRoot = "D:\AI-story\repos\localminidrama"
+$localMiniDramaBackendRoot = Join-Path $localMiniDramaRoot "backend-node"
 $localMiniDramaLogs = "D:\AI-story\logs"
 $localMiniDramaPids = "D:\AI-story\pids"
 $aiStoryLogs = Join-Path $aiStoryRoot ".logs"
+$safeBackendLauncher = Join-Path $aiStoryRoot "scripts\localminidrama-safe-launch.cjs"
+$bindHost = if ($AllowLanBinding) { "0.0.0.0" } else { "127.0.0.1" }
+$backendArguments = @(
+  $safeBackendLauncher,
+  "--backend-root",
+  $localMiniDramaBackendRoot,
+  "--port",
+  "5679"
+)
+if ($AllowLanBinding) {
+  $backendArguments += "--allow-lan-binding"
+  Write-Warning "LAN binding explicitly enabled for this development run. All three services may be reachable from the local network; TLS verification remains enabled."
+}
 
 $services = @(
   @{
@@ -26,47 +41,105 @@ $services = @(
     Port = 4200
     Root = $aiStoryRoot
     Command = "pnpm.cmd"
-    Arguments = @("dev", "--hostname", "0.0.0.0", "--port", "4200")
+    Arguments = @("exec", "next", "dev", "--hostname", $bindHost, "--port", "4200")
     Stdout = Join-Path $aiStoryLogs "dev-4200.out.log"
     Stderr = Join-Path $aiStoryLogs "dev-4200.err.log"
     PidFile = Join-Path $aiStoryLogs "dev-4200.wrapper.pid"
     HealthUrl = "http://127.0.0.1:4200/"
+    ExpectedStatus = 200
+    RequiredCommandLineFragments = @($aiStoryRoot, "start-server.js")
   },
   @{
     Name = "LocalMiniDrama backend"
     Port = 5679
-    Root = Join-Path $localMiniDramaRoot "backend-node"
-    Command = "npm.cmd"
-    Arguments = @("start")
+    Root = $localMiniDramaBackendRoot
+    Command = "node.exe"
+    Arguments = $backendArguments
     Stdout = Join-Path $localMiniDramaLogs "localminidrama-backend-5679.out.log"
     Stderr = Join-Path $localMiniDramaLogs "localminidrama-backend-5679.err.log"
     PidFile = Join-Path $localMiniDramaPids "localminidrama-backend-5679.wrapper.pid"
     HealthUrl = "http://127.0.0.1:5679/health"
+    ExpectedStatus = 200
+    RequiredCommandLineFragments = @(
+      $safeBackendLauncher,
+      "--backend-root",
+      $localMiniDramaBackendRoot
+    )
   },
   @{
     Name = "LocalMiniDrama frontend"
     Port = 4107
     Root = Join-Path $localMiniDramaRoot "frontweb"
     Command = "npm.cmd"
-    Arguments = @("run", "dev", "--", "--host", "0.0.0.0", "--port", "4107")
+    Arguments = @("run", "dev", "--", "--host", $bindHost, "--port", "4107")
     Stdout = Join-Path $localMiniDramaLogs "localminidrama-frontweb-4107.out.log"
     Stderr = Join-Path $localMiniDramaLogs "localminidrama-frontweb-4107.err.log"
     PidFile = Join-Path $localMiniDramaPids "localminidrama-frontweb-4107.wrapper.pid"
-    HealthUrl = "http://127.0.0.1:4107/"
+    HealthUrl = "http://127.0.0.1:4107/health"
+    ExpectedStatus = 200
+    RequiredCommandLineFragments = @(
+      (Join-Path $localMiniDramaRoot "frontweb"),
+      "vite"
+    )
   }
 )
 
-function Get-ListenerProcessId {
+function Get-ListenerConnections {
   param([int]$Port)
-  $connection = Get-NetTCPConnection `
+  return @(
+    Get-NetTCPConnection `
     -LocalPort $Port `
     -State Listen `
-    -ErrorAction SilentlyContinue |
-    Select-Object -First 1
-  if ($connection) {
-    return [int]$connection.OwningProcess
+    -ErrorAction SilentlyContinue
+  )
+}
+
+function Assert-ExpectedListenerBinding {
+  param(
+    [hashtable]$Service,
+    [object[]]$Connections
+  )
+  if (-not $Connections -or $Connections.Count -eq 0) {
+    return $null
   }
-  return $null
+
+  $allowedAddresses = if ($AllowLanBinding) {
+    @("127.0.0.1", "::1", "0.0.0.0", "::")
+  } else {
+    @("127.0.0.1", "::1")
+  }
+  $unexpected = @(
+    $Connections | Where-Object { $allowedAddresses -notcontains $_.LocalAddress }
+  )
+  if ($unexpected.Count -gt 0) {
+    $details = ($unexpected | ForEach-Object {
+      "$($_.LocalAddress):$($_.LocalPort) PID $($_.OwningProcess)"
+    }) -join ", "
+    throw "$($Service.Name) has an unsafe existing listener: $details. Stop it explicitly or rerun with -AllowLanBinding after reviewing the LAN exposure risk."
+  }
+
+  $processIds = @(
+    $Connections | Select-Object -ExpandProperty OwningProcess -Unique
+  )
+  if ($processIds.Count -ne 1) {
+    throw "$($Service.Name) port $($Service.Port) is owned by multiple listeners; refusing to treat it as healthy."
+  }
+  $listenerProcessId = [int]$processIds[0]
+  if ($Service.RequiredCommandLineFragments) {
+    $listenerProcess = Get-CimInstance `
+      -ClassName Win32_Process `
+      -Filter "ProcessId = $listenerProcessId" `
+      -ErrorAction SilentlyContinue
+    if (-not $listenerProcess -or -not $listenerProcess.CommandLine) {
+      throw "$($Service.Name) listener PID $listenerProcessId has no verifiable command provenance."
+    }
+    foreach ($fragment in $Service.RequiredCommandLineFragments) {
+      if (-not $listenerProcess.CommandLine.Contains([string]$fragment)) {
+        throw "$($Service.Name) listener PID $listenerProcessId was not started through the expected AIstory-owned command. Stop it explicitly before retrying."
+      }
+    }
+  }
+  return $listenerProcessId
 }
 
 function Test-HttpEndpoint {
@@ -75,6 +148,7 @@ function Test-HttpEndpoint {
     $response = Invoke-WebRequest `
       -Uri $Url `
       -UseBasicParsing `
+      -MaximumRedirection 0 `
       -TimeoutSec 5
     return [int]$response.StatusCode
   } catch {
@@ -92,10 +166,13 @@ function Wait-ServiceReady {
   )
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
   do {
-    $listenerProcessId = Get-ListenerProcessId -Port $Service.Port
+    $connections = @(Get-ListenerConnections -Port $Service.Port)
+    $listenerProcessId = Assert-ExpectedListenerBinding `
+      -Service $Service `
+      -Connections $connections
     if ($listenerProcessId) {
       $status = Test-HttpEndpoint -Url $Service.HealthUrl
-      if ($status -ge 200 -and $status -lt 500) {
+      if ($status -eq $Service.ExpectedStatus) {
         return @{
           Pid = $listenerProcessId
           HttpStatus = $status
@@ -106,18 +183,22 @@ function Wait-ServiceReady {
   } while ((Get-Date) -lt $deadline)
 
   return @{
-    Pid = Get-ListenerProcessId -Port $Service.Port
+    Pid = Assert-ExpectedListenerBinding `
+      -Service $Service `
+      -Connections @(Get-ListenerConnections -Port $Service.Port)
     HttpStatus = Test-HttpEndpoint -Url $Service.HealthUrl
   }
 }
 
-foreach ($directory in @(
-  $aiStoryLogs,
-  $localMiniDramaLogs,
-  $localMiniDramaPids
-)) {
-  if (-not (Test-Path -LiteralPath $directory)) {
-    New-Item -ItemType Directory -Path $directory -Force | Out-Null
+if (-not $StatusOnly) {
+  foreach ($directory in @(
+    $aiStoryLogs,
+    $localMiniDramaLogs,
+    $localMiniDramaPids
+  )) {
+    if (-not (Test-Path -LiteralPath $directory)) {
+      New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    }
   }
 }
 
@@ -127,7 +208,9 @@ foreach ($service in $services) {
     throw "$($service.Name) root does not exist: $($service.Root)"
   }
 
-  $listenerProcessId = Get-ListenerProcessId -Port $service.Port
+  $listenerProcessId = Assert-ExpectedListenerBinding `
+    -Service $service `
+    -Connections @(Get-ListenerConnections -Port $service.Port)
   if ($listenerProcessId) {
     Write-Host "[running] $($service.Name) port $($service.Port), PID $listenerProcessId"
     continue
@@ -156,8 +239,9 @@ foreach ($service in $services) {
 
 $results = @()
 foreach ($service in $services) {
-  $ready = Wait-ServiceReady -Service $service -TimeoutSeconds $WaitSeconds
-  $ok = $ready.Pid -and $ready.HttpStatus -ge 200 -and $ready.HttpStatus -lt 500
+  $timeout = if ($StatusOnly) { 1 } else { $WaitSeconds }
+  $ready = Wait-ServiceReady -Service $service -TimeoutSeconds $timeout
+  $ok = $ready.Pid -and $ready.HttpStatus -eq $service.ExpectedStatus
   $results += [pscustomobject]@{
     Service = $service.Name
     Port = $service.Port
@@ -174,19 +258,19 @@ if (($results | Where-Object State -ne "ready").Count -gt 0) {
   exit 1
 }
 
-$bridgeUrls = @(
-  "http://127.0.0.1:4200/api/localminidrama/status",
-  "http://127.0.0.1:4200/api/localminidrama/dramas",
-  "http://127.0.0.1:4200/studio"
+$bridgeChecks = @(
+  @{ Url = "http://127.0.0.1:4200/api/localminidrama/status"; ExpectedStatus = 200 },
+  @{ Url = "http://127.0.0.1:4200/api/localminidrama/dramas"; ExpectedStatus = 200 },
+  @{ Url = "http://127.0.0.1:4200/studio"; ExpectedStatus = 200 }
 )
 
-foreach ($url in $bridgeUrls) {
-  $status = Test-HttpEndpoint -Url $url
-  if ($status -lt 200 -or $status -ge 500) {
-    Write-Error "Bridge check failed: HTTP $status $url"
+foreach ($check in $bridgeChecks) {
+  $status = Test-HttpEndpoint -Url $check.Url
+  if ($status -ne $check.ExpectedStatus) {
+    Write-Error "Bridge check failed: expected HTTP $($check.ExpectedStatus), received HTTP $status $($check.Url)"
     exit 1
   }
-  Write-Host "[http $status] $url"
+  Write-Host "[http $status] $($check.Url)"
 }
 
 if ($started.Count -eq 0) {

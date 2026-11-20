@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "noEmit": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "lib/company-account/v1/**/*.ts",
+    "app/api/company-account/v1/**/*.ts",
+    "scripts/test-company-account-v1.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".tmp",
+    "app/app",
+    "components/components",
+    "lib/lib"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "noEmit": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "lib/steam/referencePreparation.ts",
+    "lib/steam/referencePreparationServer.ts",
+    "scripts/test-steam-reference-preparation.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".next",
+    ".tmp",
+    "app/app",
+    "components/components",
+    "lib/lib"
+  ]
+}

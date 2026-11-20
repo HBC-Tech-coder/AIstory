@@ -54,6 +54,10 @@ type AnalyticsEventData = {
   freeform_input: { scene_index: number; text_length: number };
   tts_toggle: { muted: boolean };
   fullscreen_toggle: { on: boolean };
+  video_playback_complete: {
+    completion_reason: "completed" | "skipped" | "seeked";
+    scene_index: number;
+  };
   play_heartbeat: never;
   gallery_export: { scene_count: number; audio_count: number };
   login_success: { provider: "google" | "github" | "email" | "phone" };

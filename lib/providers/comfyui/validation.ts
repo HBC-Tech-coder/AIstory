@@ -23,6 +23,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function isSafeWorkflowIdentifier(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 128 &&
+    !/[\u0000-\u001f\u007f]/.test(value) &&
+    !/^[a-zA-Z]:[\\/]/.test(value) &&
+    !/^\\\\/.test(value) &&
+    !/^\//.test(value) &&
+    !/(^|[\\/])\.\.([\\/]|$)/.test(value)
+  );
+}
+
 function validateBinding(
   binding: ComfyUINodeInputBinding | undefined,
   path: string,
@@ -30,11 +43,18 @@ function validateBinding(
   issues: ComfyUIValidationIssue[],
 ) {
   if (!binding) return;
-  if (!binding.nodeId || !workflow[binding.nodeId]) {
+  const boundNode = workflow[binding.nodeId];
+  if (!binding.nodeId || !boundNode) {
     issue(issues, `${path}.nodeId`, "绑定的节点不存在于 workflow。");
   }
   if (!binding.input?.trim()) {
     issue(issues, `${path}.input`, "输入字段名不能为空。");
+  } else if (
+    boundNode &&
+    (!isRecord(boundNode.inputs) ||
+      !Object.prototype.hasOwnProperty.call(boundNode.inputs, binding.input))
+  ) {
+    issue(issues, `${path}.input`, "绑定的节点输入不存在。");
   }
 }
 
@@ -94,7 +114,8 @@ function validateWorkflow(
     if (
       nodeId === "__proto__" ||
       nodeId === "prototype" ||
-      nodeId === "constructor"
+      nodeId === "constructor" ||
+      !isSafeWorkflowIdentifier(nodeId)
     ) {
       issue(issues, `${path}.workflow.${nodeId}`, "不允许危险节点标识。");
       continue;
@@ -103,7 +124,7 @@ function validateWorkflow(
       issue(issues, `${path}.workflow.${nodeId}`, "节点必须是对象。");
       continue;
     }
-    if (typeof rawNode.class_type !== "string" || !rawNode.class_type.trim()) {
+    if (!isSafeWorkflowIdentifier(rawNode.class_type)) {
       issue(issues, `${path}.workflow.${nodeId}.class_type`, "节点缺少 class_type。");
     }
     if (!isRecord(rawNode.inputs)) {
@@ -131,7 +152,7 @@ function validateWorkflow(
     issue(issues, `${path}.outputNodeIds`, "至少声明一个输出节点。");
   } else {
     config.outputNodeIds.forEach((nodeId, index) => {
-      if (!workflow[nodeId]) {
+      if (!isSafeWorkflowIdentifier(nodeId) || !workflow[nodeId]) {
         issue(issues, `${path}.outputNodeIds.${index}`, "输出节点不存在于 workflow。");
       }
     });

@@ -1,9 +1,11 @@
 import "server-only";
 
 import type { CredentialMode } from "./types";
+import type { AiUserLinkedBillingPhoneUserId } from "@/lib/auth/aiUserLinkedBillingRepository";
 
 export type CredentialAccessDecision =
-  | { allowed: true; mode: CredentialMode }
+  | { allowed: true; mode: "user_byok" }
+  | { allowed: true; mode: "platform_managed"; billingUserId: string }
   | {
       allowed: false;
       mode: CredentialMode;
@@ -45,6 +47,9 @@ export function authorizeCredentialAccess(input: {
   requestedMode?: unknown;
   hasByok: boolean;
   userId: string;
+  authType: "anonymous" | "phone" | "supabase" | "aiuser" | "passport_v4";
+  /** Server-resolved existing phone UUID for an explicitly linked AIUser. Never read from a request body. */
+  verifiedLinkedPhoneUserId?: AiUserLinkedBillingPhoneUserId;
   env?: CredentialPolicyEnvironment;
 }): CredentialAccessDecision {
   const mode = resolveCredentialMode(input.requestedMode, input.hasByok);
@@ -61,8 +66,24 @@ export function authorizeCredentialAccess(input: {
   }
 
   const env = input.env ?? process.env;
+  if (input.authType === "passport_v4") {
+    return {
+      allowed: false,
+      mode,
+      status: 403,
+      code: "PLATFORM_MANAGED_FORBIDDEN",
+      message: "灵号通行证会话不读取或关联旧积分账户，请使用我的 API（BYOK）。",
+    };
+  }
+  const linkedPhoneUserId = input.authType === "aiuser"
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(input.verifiedLinkedPhoneUserId ?? "")
+    ? input.verifiedLinkedPhoneUserId
+    : undefined;
+  const billingUserId = input.authType === "phone" && input.userId !== "anonymous"
+    ? input.userId
+    : linkedPhoneUserId;
   if (env.AISTORY_PLATFORM_BILLING_ENABLED === "true") {
-    if (input.userId === "anonymous") {
+    if (!billingUserId) {
       return {
         allowed: false,
         mode,
@@ -71,7 +92,7 @@ export function authorizeCredentialAccess(input: {
         message: "此操作将使用平台积分，请先完成手机号验证码登录。",
       };
     }
-    return { allowed: true, mode };
+    return { allowed: true, mode, billingUserId };
   }
 
   if (env.AISTORY_PLATFORM_MANAGED_ENABLED !== "true") {
@@ -85,7 +106,16 @@ export function authorizeCredentialAccess(input: {
   }
 
   const allowlist = readAllowlist(env.AISTORY_PLATFORM_MANAGED_ALLOWLIST);
-  if (input.userId === "anonymous" || !allowlist.has(input.userId)) {
+  if (!billingUserId) {
+    return {
+      allowed: false,
+      mode,
+      status: 401,
+      code: "PHONE_VERIFICATION_REQUIRED",
+      message: "此操作将使用平台积分，请先完成手机号验证码登录。",
+    };
+  }
+  if (!allowlist.has(billingUserId)) {
     return {
       allowed: false,
       mode,
@@ -94,7 +124,7 @@ export function authorizeCredentialAccess(input: {
       message: "当前账户不在平台积分内部测试范围。",
     };
   }
-  return { allowed: true, mode };
+  return { allowed: true, mode, billingUserId };
 }
 
 export function hasByokPayload(value: unknown): boolean {

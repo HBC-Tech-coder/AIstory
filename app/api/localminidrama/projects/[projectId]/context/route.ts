@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 
 import { getLocalMiniDramaProjectContext } from "@/lib/localminidrama/server";
+import { isLoopbackReadRequest } from "@/lib/security/localMutation";
 
 export const runtime = "nodejs";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ projectId: string }> },
 ) {
+  if (!isLoopbackReadRequest(request)) {
+    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  }
   const { projectId } = await context.params;
   const id = Number(projectId);
   if (!Number.isSafeInteger(id) || id <= 0) {

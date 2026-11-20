@@ -1,6 +1,8 @@
 type RetryInit = RequestInit & {
   retries?: number;
   retryDelayMs?: number;
+  /** Called immediately before each real fetch attempt. Callers must keep it idempotent. */
+  onRequestStart?: () => void;
   /**
    * Per-attempt hard deadline. A timed-out attempt counts as a retryable
    * failure (it consumes retry budget like a 5xx). Unset → no client-side
@@ -13,7 +15,13 @@ export async function fetchWithRetry(
   url: string,
   init: RetryInit,
 ): Promise<Response> {
-  const { retries = 2, retryDelayMs = 1500, timeoutMs, ...fetchInit } = init;
+  const {
+    retries = 2,
+    retryDelayMs = 1500,
+    timeoutMs,
+    onRequestStart,
+    ...fetchInit
+  } = init;
   if (!fetchInit.redirect) fetchInit.redirect = "manual";
   // Caller-supplied signal (e.g. a hedge loser being cancelled) must abort
   // immediately and permanently — it is NOT retryable, unlike our own
@@ -29,6 +37,7 @@ export async function fetchWithRetry(
         : AbortSignal.timeout(timeoutMs)
       : externalSignal;
     try {
+      onRequestStart?.();
       const res = await fetch(url, { ...fetchInit, signal: attemptSignal });
       if (res.ok) return res;
       // 429 is often a transient provider quota/rate-window response. Respect

@@ -44,7 +44,7 @@ function characterReferenceImage(character: Character | undefined): string | und
     ? character.spriteStates?.find((sprite) => sprite.id === stateId)
     : undefined;
   const currentSprite = character.spriteStates?.find((sprite) => sprite.id === "current");
-  return (
+  const reference = (
     stateSprite?.portraitUrl
     ?? stateSprite?.portraitUuid
     ?? currentSprite?.portraitUrl
@@ -52,6 +52,11 @@ function characterReferenceImage(character: Character | undefined): string | und
     ?? character.basePortraitUrl
     ?? character.basePortraitUuid
   );
+  if (reference == null || reference === "") return undefined;
+  if (typeof reference !== "string") {
+    throw new TypeError("Character reference image must be a string.");
+  }
+  return reference;
 }
 
 export type PainterInput = {
@@ -98,6 +103,9 @@ export function collectReferenceImages(
   // it anchors the whole-session painting STYLE (brush / color / mood) that
   // the user explicitly chose. priorScene continuity comes second; character
   // archetypes are partially covered by the prompt text anyway.
+  if (styleReferenceImage != null && typeof styleReferenceImage !== "string") {
+    throw new TypeError("Style reference image must be a string.");
+  }
   if (styleReferenceImage) {
     refs.push(styleReferenceImage);
   }
@@ -105,6 +113,9 @@ export function collectReferenceImages(
   // Slot N — prior scene image for spatial continuity. Backdrop drift is the
   // next-most jarring discontinuity across same-sceneKey scenes; character
   // drift is partially masked by character archetype text in the prompt.
+  if (priorSceneImage != null && typeof priorSceneImage !== "string") {
+    throw new TypeError("Prior-scene reference image must be a string.");
+  }
   if (priorSceneImage) {
     refs.push(priorSceneImage);
   }
@@ -140,10 +151,6 @@ export function collectReferenceImages(
   return refs.slice(0, MAX_REFERENCE_IMAGES);
 }
 
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
 async function tryGenerate(
   config: ProviderConfig,
   prompt: string,
@@ -152,8 +159,8 @@ async function tryGenerate(
 ): Promise<GenerateImageResult | null> {
   try {
     return await generateImage(config, prompt, options);
-  } catch (err) {
-    console.warn(`[painter] ${label} failed: ${errMsg(err)}`);
+  } catch {
+    console.warn(`[painter] ${label} failed; using fallback tier.`);
     return null;
   }
 }
@@ -203,7 +210,7 @@ async function tryGenerateHedged(
   if (first !== "hedge") {
     clearTimeout(timer);
     if ("ok" in first) return first.ok;
-    console.warn(`[painter] ${label} failed: ${errMsg(first.err)}`);
+    console.warn(`[painter] ${label} failed; using fallback tier.`);
     return null;
   }
 
@@ -216,7 +223,7 @@ async function tryGenerateHedged(
   if ("err" in result) {
     // First settler failed — give the survivor its full chance.
     console.warn(
-      `[painter] hedge leg${result.leg} failed: ${errMsg(result.err)}`,
+      `[painter] hedge leg${result.leg} failed; waiting for the remaining leg.`,
     );
     result = await (result.leg === 1 ? leg2 : leg1);
   }
@@ -235,7 +242,7 @@ async function tryGenerateHedged(
     return result.ok;
   }
   console.warn(
-    `[painter] ${label} failed (both hedge legs): ${errMsg(result.err)}`,
+    `[painter] ${label} failed in both hedge legs; using fallback tier.`,
   );
   return null;
 }
@@ -248,6 +255,7 @@ export async function runPainter(
   config: EngineConfig,
   input: PainterInput,
   entryBeat: Beat | undefined,
+  hooks: Readonly<{ onProviderStarted?: () => void }> = {},
 ): Promise<PainterResult> {
   if (config.mockImage) {
     return { kind: "mock", imageUrl: await mockImageDataUri(input.orientation) };
@@ -266,6 +274,12 @@ export async function runPainter(
     input.priorSceneImage,
     input.styleReferenceImage,
   );
+  let providerStarted = false;
+  const markProviderStarted = () => {
+    if (providerStarted) return;
+    providerStarted = true;
+    hooks.onProviderStarted?.();
+  };
 
   // Tier A — with referenceImages (priorSceneImage + character portraits).
   // FLUX.2 [klein] 9B KV's KV cache accelerates this multi-reference path
@@ -276,6 +290,7 @@ export async function runPainter(
       referenceImages: refs,
       orientation: input.orientation,
       timeoutMs: config.imageTimeoutMs,
+      onProviderStarted: markProviderStarted,
     };
     const label = `referenceImages (${refs.length})`;
     const r =
@@ -298,10 +313,11 @@ export async function runPainter(
     const r = await generateImage(config.image, prompt, {
       orientation: input.orientation,
       timeoutMs: config.imageTimeoutMs,
+      onProviderStarted: markProviderStarted,
     });
     return { kind: "real", imageUrl: r.imageUrl, imageUuid: r.imageUuid };
-  } catch (err) {
-    console.warn(`[painter] text-to-image failed, falling back to placeholder: ${errMsg(err)}`);
+  } catch {
+    console.warn("[painter] text-to-image failed; using a safe placeholder.");
     return { kind: "mock", imageUrl: await mockImageDataUri(input.orientation) };
   }
 }

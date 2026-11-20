@@ -12,6 +12,7 @@ import {
   type StudioGenerationEngine,
 } from "@/lib/generation-jobs/studioRequest";
 import type { GenerationJob } from "@/lib/generation-jobs/types";
+import type { LanGpuCoordinatorStudioStatus } from "@/lib/gpu-coordinator/generationJobAdapter";
 import type {
   LocalMiniDramaCapabilityStatus,
   LocalMiniDramaDrama,
@@ -45,6 +46,7 @@ export function LocalGenerationPanel({
   providerStatus,
   localMiniDramaStatus,
   volcengineStatus,
+  lanGpuStatus,
   projects,
   projectId,
   onSelectProject,
@@ -53,6 +55,7 @@ export function LocalGenerationPanel({
   providerStatus: ComfyUIProviderStatus | null;
   localMiniDramaStatus: LocalMiniDramaCapabilityStatus | null;
   volcengineStatus: VolcengineAgentPlanStatus | null;
+  lanGpuStatus: LanGpuCoordinatorStudioStatus | null;
   projects: LocalMiniDramaDrama[];
   projectId: number | null;
   onSelectProject: (projectId: number) => void;
@@ -291,13 +294,13 @@ export function LocalGenerationPanel({
 
   const adoptedJobIds = new Set(assets.map((asset) => asset.jobId));
   const projectSelector = (
-    <label className="block text-xs text-[#6d5c48]">
+    <label className="ui-copy block text-xs">
       当前项目
       <select
         value={projectId ?? ""}
         onChange={(event) => onSelectProject(Number(event.target.value))}
         disabled={projects.length === 0}
-        className="mt-1 h-10 w-full border border-[#6f4f2f]/25 bg-[#fffdf8] px-3 text-sm"
+        className="ui-input mt-1 h-10 w-full border px-3 text-sm"
       >
         {projects.length === 0 && <option value="">暂无可用项目</option>}
         {projects.map((project) => (
@@ -309,18 +312,18 @@ export function LocalGenerationPanel({
     </label>
   );
   const assetLibrary = (
-    <div className="border border-[#6f4f2f]/15 bg-[#fffdf8] p-3">
+    <div className="ui-surface border p-3">
       <div className="flex items-center justify-between gap-3">
         <h3 className="font-serif text-lg">AIstory 项目素材</h3>
-        <span className="text-xs text-[#756552]">{assets.length} 项</span>
+        <span className="ui-muted text-xs">{assets.length} 项</span>
       </div>
       {engine === "localminidrama" && (
-        <p className="mt-1 text-[11px] text-[#8a6745]">
+        <p className="ui-muted mt-1 text-[11px]">
           LocalMiniDrama 安全模式不传递项目素材 URL；已选 ComfyUI 参考会保留但本次不使用。
         </p>
       )}
       {assets.length === 0 ? (
-        <p className="mt-2 border border-dashed border-[#6f4f2f]/20 px-3 py-4 text-xs text-[#756552]">
+        <p className="ui-muted ui-border mt-2 border border-dashed px-3 py-4 text-xs">
           {projectId ? "暂无本地素材；生成成功后可一键加入。" : "请先选择当前项目。"}
         </p>
       ) : (
@@ -330,12 +333,12 @@ export function LocalGenerationPanel({
               key={asset.id}
               className={`w-32 shrink-0 border bg-white p-2 ${
                 selectedAssetId === asset.id
-                  ? "border-[#8a5a2b] ring-1 ring-[#8a5a2b]"
-                  : "border-[#6f4f2f]/15"
+                  ? "border-ember-500 ring-1 ring-ember-500"
+                  : "border-clay-900/15"
               }`}
               title={`${asset.provider} · ${asset.contentType} · ${asset.bytes.toLocaleString()} bytes`}
             >
-              <div className="aspect-square overflow-hidden bg-[#eee5d5]">
+              <div className="aspect-square overflow-hidden bg-cream-200">
                 {asset.modality === "video" ? (
                   <video src={asset.url} className="h-full w-full object-cover" muted />
                 ) : (
@@ -349,10 +352,10 @@ export function LocalGenerationPanel({
                   />
                 )}
               </div>
-              <p className="mt-1 truncate text-[11px] font-medium text-[#6d5134]">
+              <p className="mt-1 truncate text-[11px] font-medium text-clay-700">
                 {asset.name}
               </p>
-              <p className="truncate text-[10px] text-[#806f5b]">
+              <p className="truncate text-[10px] text-clay-500">
                 {asset.provider} · {asset.orientation}
               </p>
               {asset.modality === "image" ? (
@@ -370,7 +373,7 @@ export function LocalGenerationPanel({
                         : "已选择项目素材作为下一次生成参考图。",
                     );
                   }}
-                  className="mt-2 h-7 w-full border border-[#8a5a2b]/40 px-1 text-[10px] text-[#7b4e25] disabled:cursor-not-allowed disabled:opacity-45"
+                  className="ui-button-secondary mt-2 h-7 w-full border px-1 text-[10px]"
                 >
                   {engine === "localminidrama"
                     ? "仅 ComfyUI 可用"
@@ -379,7 +382,7 @@ export function LocalGenerationPanel({
                       : "用作参考图"}
                 </button>
               ) : (
-                <p className="mt-2 text-[10px] text-[#8a7560]">视频不可作图片参考</p>
+                <p className="ui-muted mt-2 text-[10px]">视频不可作图片参考</p>
               )}
             </article>
           ))}
@@ -390,21 +393,33 @@ export function LocalGenerationPanel({
 
   return (
     <section className="grid gap-4 p-4 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-      <div className="border border-[#6f4f2f]/20 bg-white/60 p-4">
+      <div className="ui-surface border p-4">
         <div className="flex items-center justify-between gap-3">
           <h1 className="font-serif text-2xl">本地生成</h1>
-          <span className="text-xs text-[#756552]">
+          <span className="ui-muted text-xs">
             ComfyUI {comfyReady ? "已连接" : "不可用"} · LocalMiniDrama{" "}
             {localMiniDramaReady ? "已连接" : "不可用"}
           </span>
         </div>
-        <div className="mt-2 border border-[#6f4f2f]/15 bg-[#8a5a2b]/5 px-3 py-2 text-xs text-[#6d5c48]">
+        <div className="mt-2 border border-ember-500/15 bg-ember-500/5 px-3 py-2 text-xs text-clay-600">
           火山 Agent Plan：
           {volcengineStatus?.state === "contract_ready" ? "异步契约就绪" : "待配置"}
           ；视频任务不阻塞剧情，状态文案为“{VOLCENGINE_VIDEO_PENDING_MESSAGE}”。
         </div>
+        <div className="mt-2 border border-ember-500/15 bg-ember-500/5 px-3 py-2 text-xs text-clay-600">
+          GPU LAN LAB：
+          {lanGpuStatus?.state === "online"
+            ? "在线"
+            : lanGpuStatus?.state === "offline"
+              ? "离线"
+              : "未启用"}
+          {lanGpuStatus?.active
+            ? ` · ${lanGpuStatus.active.status} ${lanGpuStatus.active.progress}%`
+            : ""}
+          ；仅管理员可提交或取消，产物固定为不可发布候选。
+        </div>
         <div
-          className="mt-4 grid grid-cols-2 gap-1 border border-[#6f4f2f]/20 bg-[#eee5d5] p-1"
+          className="mt-4 grid grid-cols-2 gap-1 border border-clay-900/15 bg-cream-200 p-1"
           aria-label="本地生成引擎"
         >
           {(
@@ -422,8 +437,8 @@ export function LocalGenerationPanel({
               }}
               className={`min-w-0 px-2 py-2 text-xs font-semibold transition ${
                 engine === value
-                  ? "bg-[#8a5a2b] text-white"
-                  : "bg-white/60 text-[#6d5134]"
+                  ? "bg-ember-500 text-white"
+                  : "bg-cream-50/70 text-clay-700"
               }`}
               aria-pressed={engine === value}
             >
@@ -431,19 +446,19 @@ export function LocalGenerationPanel({
             </button>
           ))}
         </div>
-        <p className="mt-2 text-[11px] leading-5 text-[#756552]">
+        <p className="ui-muted mt-2 text-[11px] leading-5">
           {engine === "comfyui"
             ? "使用管理员注册的本机 workflow，可使用受控参考图。"
             : "使用当前项目和 donor 安全字段；不传 provider、model、路径或素材 URL。"}
         </p>
         <div className="mt-4">{projectSelector}</div>
         {engine === "comfyui" ? (
-          <label className="mt-4 block text-xs text-[#6d5c48]">
+          <label className="ui-copy mt-4 block text-xs">
             Workflow 模板
             <select
               value={workflowId}
               onChange={(event) => setWorkflowId(event.target.value)}
-              className="mt-1 h-10 w-full border border-[#6f4f2f]/25 bg-[#fffdf8] px-3 text-sm"
+              className="ui-input mt-1 h-10 w-full border px-3 text-sm"
             >
               {imageWorkflows.length === 0 && (
                 <option value="">暂无已启用图片模板</option>
@@ -456,53 +471,53 @@ export function LocalGenerationPanel({
             </select>
           </label>
         ) : (
-          <label className="mt-4 block text-xs text-[#6d5c48]">
+          <label className="ui-copy mt-4 block text-xs">
             画面风格（可选）
             <input
               value={localMiniDramaStyle}
               onChange={(event) => setLocalMiniDramaStyle(event.target.value)}
               maxLength={160}
-              className="mt-1 h-10 w-full border border-[#6f4f2f]/25 bg-[#fffdf8] px-3 text-sm"
+              className="ui-input mt-1 h-10 w-full border px-3 text-sm"
               placeholder="沿用项目风格或填写简短风格描述"
             />
           </label>
         )}
-        <label className="mt-3 block text-xs text-[#6d5c48]">
+        <label className="ui-copy mt-3 block text-xs">
           图片描述
           <textarea
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
             rows={5}
             maxLength={4_000}
-            className="mt-1 w-full resize-y border border-[#6f4f2f]/25 bg-[#fffdf8] p-3 text-sm"
+            className="ui-input mt-1 w-full resize-y border p-3 text-sm"
             placeholder="描述画面、角色状态与构图"
           />
         </label>
-        <label className="mt-3 block text-xs text-[#6d5c48]">
+        <label className="ui-copy mt-3 block text-xs">
           避免内容（可选）
           <input
             value={negativePrompt}
             onChange={(event) => setNegativePrompt(event.target.value)}
             maxLength={1_000}
-            className="mt-1 h-10 w-full border border-[#6f4f2f]/25 bg-[#fffdf8] px-3 text-sm"
+            className="ui-input mt-1 h-10 w-full border px-3 text-sm"
           />
         </label>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="block text-xs text-[#6d5c48]">
+          <label className="ui-copy block text-xs">
             画幅
             <select
               value={orientation}
               onChange={(event) =>
                 setOrientation(event.target.value as "landscape" | "portrait")
               }
-              className="mt-1 h-10 w-full border border-[#6f4f2f]/25 bg-[#fffdf8] px-3 text-sm"
+              className="ui-input mt-1 h-10 w-full border px-3 text-sm"
             >
               <option value="landscape">横屏 16:9</option>
               <option value="portrait">竖屏 9:16</option>
             </select>
           </label>
           {engine === "comfyui" ? (
-            <label className="block text-xs text-[#6d5c48]">
+            <label className="ui-copy block text-xs">
               参考图（可选）
               <input
                 type="file"
@@ -511,11 +526,11 @@ export function LocalGenerationPanel({
                   setReference(event.target.files?.[0] ?? null);
                   setSelectedAssetId("");
                 }}
-                className="mt-1 block h-10 w-full text-xs file:mr-2 file:h-10 file:border-0 file:bg-[#8a5a2b]/10 file:px-3"
+                className="mt-1 block h-10 w-full text-xs file:mr-2 file:h-10 file:border-0 file:bg-ember-500/10 file:px-3"
               />
             </label>
           ) : (
-            <div className="border border-[#6f4f2f]/15 bg-[#8a5a2b]/5 p-3 text-xs leading-5 text-[#756552]">
+            <div className="ui-muted border border-ember-500/15 bg-ember-500/5 p-3 text-xs leading-5">
               输出尺寸：{orientation === "portrait" ? "768×1344" : "1344×768"}
               <br />
               当前引擎不使用 ComfyUI 参考图或项目素材 URL。
@@ -527,7 +542,7 @@ export function LocalGenerationPanel({
           onClick={() => void submit()}
           disabled={busy || Boolean(disabledReason)}
           title={disabledReason}
-          className="mt-4 h-11 w-full bg-[#8a5a2b] px-4 text-sm font-semibold text-white disabled:opacity-45"
+          className="ui-button-primary mt-4 h-11 w-full px-4 text-sm font-semibold"
         >
           {busy
             ? "正在提交…"
@@ -535,30 +550,30 @@ export function LocalGenerationPanel({
               ? "使用 LocalMiniDrama 生成"
               : "使用 ComfyUI 生成"}
         </button>
-        {message && <p className="mt-2 text-xs text-[#7b4e25]">{message}</p>}
+        {message && <p className="ui-primary mt-2 text-xs">{message}</p>}
         {!message && disabledReason && (
           <p className="mt-2 text-xs text-amber-800">{disabledReason}</p>
         )}
-        <p className="mt-3 text-[11px] leading-5 text-[#7b6954]">
+        <p className="ui-muted mt-3 text-[11px] leading-5">
           两种引擎都通过 AIstory GenerationJob 单并发队列。专业旧工作区的直提任务暂不受本队列控制。
         </p>
       </div>
 
-      <div className="min-w-0 border border-[#6f4f2f]/20 bg-white/45 p-4">
+      <div className="ui-surface min-w-0 border p-4">
         {assetLibrary}
         <h2 className="font-serif text-xl">生成任务</h2>
         <div className="mt-3 space-y-3">
           {visibleJobs.length === 0 && (
-            <p className="border border-dashed border-[#6f4f2f]/25 p-5 text-sm text-[#756552]">
+            <p className="ui-muted ui-border border border-dashed p-5 text-sm">
               尚无 AIstory 本地生成任务。
             </p>
           )}
           {visibleJobs.map((job) => (
             <article
               key={job.id}
-              className="grid gap-3 border border-[#6f4f2f]/15 bg-[#fffdf8] p-3 sm:grid-cols-[96px_minmax(0,1fr)_auto]"
+              className="ui-surface grid gap-3 border p-3 sm:grid-cols-[96px_minmax(0,1fr)_auto]"
             >
-              <div className="flex aspect-square items-center justify-center overflow-hidden bg-[#eee5d5]">
+              <div className="flex aspect-square items-center justify-center overflow-hidden bg-cream-200">
                 {job.artifact?.url ? (
                   <Image
                     src={job.artifact.url}
@@ -569,22 +584,22 @@ export function LocalGenerationPanel({
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <i className="fa-solid fa-image text-2xl text-[#9b8061]" />
+                  <i className="fa-solid fa-image text-2xl text-clay-400" />
                 )}
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="font-semibold text-[#6d5134]">
+                  <span className="font-semibold text-clay-700">
                     {STATUS_LABEL[job.status]}
                   </span>
-                  <span className="text-[#7b6954]">{job.progress}%</span>
-                  <span className="text-[#7b6954]">
+                  <span className="text-clay-500">{job.progress}%</span>
+                  <span className="text-clay-500">
                     {studioJobLabel(job)}
                   </span>
                 </div>
-                <div className="mt-2 h-1.5 overflow-hidden bg-[#8a5a2b]/10">
+                <div className="mt-2 h-1.5 overflow-hidden bg-ember-500/10">
                   <div
-                    className="h-full bg-[#8a5a2b] transition-all"
+                    className="h-full bg-ember-500 transition-all"
                     style={{ width: `${job.progress}%` }}
                   />
                 </div>
@@ -599,7 +614,7 @@ export function LocalGenerationPanel({
                   </p>
                 )}
                 {job.notes?.includes("artifact_unavailable") && (
-                  <p className="mt-2 text-xs text-[#756552]">
+                  <p className="ui-muted mt-2 text-xs">
                     任务已完成，但产物未通过本地安全镜像校验。
                   </p>
                 )}
@@ -612,7 +627,7 @@ export function LocalGenerationPanel({
                     disabled={
                       adoptedJobIds.has(job.id) || adoptingJobId === job.id
                     }
-                    className="h-8 border border-[#8a5a2b] px-3 text-xs text-[#8a5a2b] disabled:opacity-50"
+                    className="ui-button-secondary h-8 border px-3 text-xs"
                   >
                     {adoptedJobIds.has(job.id)
                       ? "已入素材库"
@@ -626,7 +641,7 @@ export function LocalGenerationPanel({
                   <button
                     type="button"
                     onClick={() => void act(job.id, "cancel")}
-                    className="h-8 border border-[#6f4f2f]/25 px-3 text-xs"
+                    className="ui-button-secondary h-8 border px-3 text-xs"
                   >
                     取消
                   </button>
@@ -636,7 +651,7 @@ export function LocalGenerationPanel({
                     <button
                       type="button"
                       onClick={() => void act(job.id, "retry")}
-                      className="h-8 border border-[#8a5a2b] px-3 text-xs text-[#8a5a2b]"
+                      className="ui-button-secondary h-8 border px-3 text-xs"
                     >
                       重试
                     </button>

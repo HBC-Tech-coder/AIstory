@@ -7,6 +7,10 @@ import type {
   Session,
   StoryState,
 } from "@infiplot/types";
+import {
+  coerceSceneVideoCue,
+  isControlledSceneMediaUrl,
+} from "./sceneMedia";
 
 export const STORY_SHARE_STORAGE_KEY = "infiplot:story-import";
 
@@ -77,6 +81,23 @@ function isBeat(value: unknown): value is Beat {
       return false;
     }
     const effect = choice.effect;
+    if (choice.conditions !== undefined) {
+      if (!Array.isArray(choice.conditions)) return false;
+      if (
+        choice.conditions.some(
+          (condition) =>
+            !isRecord(condition) ||
+            typeof condition.variableId !== "string" ||
+            !["eq", "neq", "gte", "lte", "gt", "lt"].includes(
+              String(condition.operator),
+            ) ||
+            typeof condition.value !== "number" ||
+            !Number.isFinite(condition.value),
+        )
+      ) {
+        return false;
+      }
+    }
     if (!isRecord(effect) || typeof effect.kind !== "string") return false;
     if (effect.kind === "advance-beat") return typeof effect.targetBeatId === "string";
     if (effect.kind === "change-scene") return typeof effect.nextSceneSeed === "string";
@@ -96,6 +117,98 @@ function isScene(value: unknown): value is Scene {
   if (value.sceneKey !== undefined && typeof value.sceneKey !== "string") return false;
   if (value.imageUuid !== undefined && typeof value.imageUuid !== "string") return false;
   if (value.orientation !== undefined && !isOrientation(value.orientation)) return false;
+  if (value.media !== undefined) {
+    if (!isRecord(value.media)) return false;
+    if (value.media.kind === "image") {
+      if (
+        value.media.url !== undefined &&
+        typeof value.media.url !== "string"
+      ) {
+        return false;
+      }
+    } else if (value.media.kind === "video") {
+      if (!isControlledSceneMediaUrl(value.media.url)) return false;
+      if (
+        value.media.assetId !== undefined &&
+        typeof value.media.assetId !== "string"
+      ) {
+        return false;
+      }
+      if (
+        value.media.durationMs !== undefined &&
+        (typeof value.media.durationMs !== "number" ||
+          !Number.isFinite(value.media.durationMs) ||
+          value.media.durationMs <= 0)
+      ) {
+        return false;
+      }
+      if (
+        value.media.hasAudio !== undefined &&
+        typeof value.media.hasAudio !== "boolean"
+      ) {
+        return false;
+      }
+      if (
+        value.media.hotspotsEnabled !== undefined &&
+        typeof value.media.hotspotsEnabled !== "boolean"
+      ) {
+        return false;
+      }
+      if (
+        value.media.allowSkip !== undefined &&
+        typeof value.media.allowSkip !== "boolean"
+      ) {
+        return false;
+      }
+      if (
+        value.media.authoredTargetNodeId !== undefined &&
+        typeof value.media.authoredTargetNodeId !== "string"
+      ) {
+        return false;
+      }
+      if (
+        value.media.authoredVariableDelta !== undefined &&
+        (!isRecord(value.media.authoredVariableDelta) ||
+          Object.values(value.media.authoredVariableDelta).some(
+            (amount) =>
+              typeof amount !== "number" || !Number.isFinite(amount),
+          ))
+      ) {
+        return false;
+      }
+      if (
+        value.media.endBehavior !== undefined &&
+        !["unlock-interaction", "advance-beat", "hold"].includes(
+          String(value.media.endBehavior),
+        )
+      ) {
+        return false;
+      }
+      if (
+        value.media.posterUrl !== undefined &&
+        !isControlledSceneMediaUrl(value.media.posterUrl)
+      ) {
+        return false;
+      }
+      if (
+        value.media.vttUrl !== undefined &&
+        !isControlledSceneMediaUrl(value.media.vttUrl)
+      ) {
+        return false;
+      }
+      if (
+        value.media.subtitles !== undefined &&
+        (!Array.isArray(value.media.subtitles) ||
+          value.media.subtitles.some(
+            (cue, index) => coerceSceneVideoCue(cue, index) === null,
+          ))
+      ) {
+        return false;
+      }
+    } else {
+      return false;
+    }
+  }
   return true;
 }
 
@@ -123,8 +236,9 @@ function isCharacter(value: unknown): value is Character {
 
 function stripCharacterVoices(characters: Character[]): Character[] {
   return characters.map((character) => {
-    const { voice: _voice, ...rest } = character;
-    return rest;
+    const safe = { ...character };
+    delete safe.voice;
+    return safe;
   });
 }
 

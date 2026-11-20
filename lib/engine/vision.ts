@@ -17,8 +17,10 @@ export async function interpret(
   config: ProviderConfig,
   annotatedImageBase64: string,
   scene: Scene | null,
+  hooks: Readonly<{ onProviderStarted?: () => void }> = {},
 ): Promise<VisionInterpretation> {
   const userPrompt = `${VISION_SYSTEM_PROMPT}\n\n${buildVisionUserPrompt(scene)}`;
+  hooks.onProviderStarted?.();
   const raw = await interpretClick(config, annotatedImageBase64, userPrompt);
   const parsed = parseJsonLoose<{
     freeformAction?: string;

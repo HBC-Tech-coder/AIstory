@@ -33,7 +33,15 @@ export type BeatNext =
 export type BeatChoice = {
   id: string;
   label: string;
+  /** Optional authored-variable gates; unavailable choices stay visible but disabled. */
+  conditions?: AuthoredVariableCondition[];
   effect: BeatChoiceEffect;
+};
+
+export type AuthoredVariableCondition = {
+  variableId: string;
+  operator: "eq" | "neq" | "gte" | "lte" | "gt" | "lt";
+  value: number;
 };
 
 export type BeatChoiceEffect =
@@ -163,6 +171,48 @@ export function coerceOrientation(value: unknown): Orientation {
   return value === "portrait" ? "portrait" : "landscape";
 }
 
+export type SceneVideoSubtitleCue = {
+  id: string;
+  startMs: number;
+  endMs: number;
+  text: string;
+  speaker?: string;
+};
+
+export type SceneImageMedia = {
+  kind: "image";
+  /** Optional controlled URL; legacy scenes continue to use Scene.imageUrl. */
+  url?: string;
+};
+
+export type SceneVideoMedia = {
+  kind: "video";
+  /**
+   * A controlled AIstory URL. Player payloads never carry local paths,
+   * provider URLs, workflow ids, or provider task ids.
+   */
+  url: string;
+  assetId?: string;
+  posterUrl?: string;
+  durationMs?: number;
+  hasAudio?: boolean;
+  subtitles?: SceneVideoSubtitleCue[];
+  vttUrl?: string;
+  endBehavior?: "unlock-interaction" | "advance-beat" | "hold";
+  /** Whether the prominent skip-to-end control is available. Defaults to true. */
+  allowSkip?: boolean;
+  /**
+   * Deterministic authored transition used only with `advance-beat`.
+   * The same idempotent video-completion gate drives ended, seek-to-end and skip.
+   */
+  authoredTargetNodeId?: string;
+  authoredVariableDelta?: Record<string, number>;
+  /** Video frames are not vision/freeform targets unless authored explicitly. */
+  hotspotsEnabled?: boolean;
+};
+
+export type SceneMedia = SceneImageMedia | SceneVideoMedia;
+
 // ──────────────────────────────────────────────────────────────────────
 //  Scene — one background image + a graph of beats.
 //  The Director emits an entire Scene per call; the player navigates
@@ -174,6 +224,11 @@ export type Scene = {
   scenePrompt: string;
   beats: Beat[];
   entryBeatId: string;
+  /**
+   * Optional discriminated scene media. Missing means the legacy image path.
+   * `imageUrl` remains for backwards-compatible rendering and poster fallback.
+   */
+  media?: SceneMedia;
   /**
    * Stable English slug identifying the visual scene's location + time,
    * e.g. "classroom-dusk", "rooftop-night". When the next Scene shares this

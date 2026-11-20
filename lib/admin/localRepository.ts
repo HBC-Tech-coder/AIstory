@@ -49,7 +49,7 @@ type LocalAdminStore = {
 const DEFAULT_BRANDING: PlatformBranding = {
   projectName: "AIstory",
   shortName: "AIstory",
-  primaryColor: "#8A5A2B",
+  primaryColor: "#315BFF",
   defaultLocale: "zh-CN",
   defaultInitialCredits: 1000,
 };

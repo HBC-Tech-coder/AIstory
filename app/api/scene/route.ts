@@ -24,10 +24,34 @@ import {
 } from "@/lib/engine/speculativeBranchCache";
 import { requireUser } from "@/lib/supabase/guard";
 import {
+  isCostBetaGenerationBilling,
+  markGenerationBillingOperationFailed,
+  markGenerationBillingProviderStarted,
+  markGenerationBillingProviderSucceeded,
   prepareGenerationBilling,
   refundGenerationBilling,
   settleGenerationBilling,
+  type GenerationBillingContext,
 } from "@/lib/billing/generationGate";
+import { assertCostBetaGeneratedCore } from "@/lib/billing/generationDelivery";
+import type { PlatformOperation } from "@/lib/billing/platformCostEnvelope";
+import { runInCostEnvelope } from "@/lib/billing/platformCostEnvelopeServer";
+import { PricingUnavailableError } from "@/lib/billing/service";
+import { isAuthoredAiContinuationAllowed } from "@/lib/case-studies/schema";
+import {
+  logSceneGenerationFailure,
+  type SceneFailureStage,
+} from "@/lib/engine/sceneFailureDiagnostic";
+
+/**
+ * Server-owned failure stages for the platform generation boundary below.
+ * These constants (never the thrown value) decide what the diagnostic records.
+ */
+const SCENE_FAILURE_STAGE = {
+  engine: "engine_generation",
+  assertCore: "core_validation",
+  envelope: "cost_envelope",
+} as const satisfies Record<string, SceneFailureStage>;
 
 function stripKnownVoices(
   characters: Character[],
@@ -42,6 +66,63 @@ function formatSSE(event: SceneStreamEvent | { type: string; [k: string]: unknow
   return `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
 }
 
+/**
+ * Runs the actual scene engine callback for platform-managed generation.
+ *
+ * Only validated cost_beta_credit_v2 billing is wrapped in the cost envelope;
+ * legacy/BYOK paths keep the original direct generate → mark → cache flow.
+ * `config` must be the FULL trusted server runtime config (including TTS even
+ * when the browser manages speech) so the envelope identity matches the
+ * pricing runtime-binding hash; the engine callback receives its own
+ * TTS-suppressed config.
+ * The essential core is validated inside the envelope BEFORE any generated
+ * result may be cached, and success is marked once after the envelope returns
+ * and image cache preparation succeeds. A sticky post-callback cap violation
+ * therefore cannot be reported as a successful delivery.
+ */
+async function runSceneGeneration(
+  billing: GenerationBillingContext,
+  config: ReturnType<typeof loadEngineConfig>,
+  operation: PlatformOperation,
+  generate: () => Promise<SceneResponse>,
+  costBetaBilling: boolean,
+): Promise<SceneResponse> {
+  markGenerationBillingProviderStarted(billing);
+  if (!costBetaBilling) {
+    const generated = await generate();
+    markGenerationBillingProviderSucceeded(billing);
+    return cacheApiResponseImage(generated);
+  }
+  let generated: SceneResponse;
+  // Updated at the exact failure point, reset after the essential-core check
+  // so a sticky post-callback envelope violation is attributed to the
+  // envelope rather than to a successfully returned callback.
+  let failureStage: SceneFailureStage = SCENE_FAILURE_STAGE.envelope;
+  try {
+    generated = await runInCostEnvelope(
+      config,
+      operation,
+      async () => {
+        failureStage = SCENE_FAILURE_STAGE.engine;
+        const result = await generate();
+        failureStage = SCENE_FAILURE_STAGE.assertCore;
+        assertCostBetaGeneratedCore(result);
+        failureStage = SCENE_FAILURE_STAGE.envelope;
+        return result;
+      },
+    );
+  } catch (error) {
+    // Trusted internal engine/essential-output failure only. Settlement,
+    // network and DB catches below never call this marker.
+    logSceneGenerationFailure(failureStage, error);
+    markGenerationBillingOperationFailed(billing);
+    throw error;
+  }
+  const cached = await cacheApiResponseImage(generated);
+  markGenerationBillingProviderSucceeded(billing);
+  return cached;
+}
+
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
@@ -54,6 +135,15 @@ export async function POST(req: Request) {
 
   if (!body.session) {
     return NextResponse.json({ error: "session is required" }, { status: 400 });
+  }
+  if (
+    body.session.authoredStory?.authorLocked
+    && !isAuthoredAiContinuationAllowed(body.session.authoredStory)
+  ) {
+    return NextResponse.json(
+      { error: "作者锁定章节不允许请求 AI 场景生成。" },
+      { status: 409 },
+    );
   }
 
   const hasByo = hasByokPayload(body.byo);
@@ -87,25 +177,59 @@ export async function POST(req: Request) {
       },
     );
   }
+  let config: ReturnType<typeof loadEngineConfig>;
+  let engineConfig: ReturnType<typeof loadEngineConfig>;
+  try {
+    if (hasByo) assertCompleteByok(body.byo);
+    config = hasByo
+      ? buildByoEngineConfig(body.byo!, loadEngineConfig())
+      : loadEngineConfig();
+    // The full server-selected runtime config is the trusted identity for
+    // platform pricing and the cost envelope: the operation runtime-binding
+    // hash covers the whole configured role set (including the optional TTS
+    // role). Client-managed speech only suppresses TTS for the actual engine,
+    // so the engine config may drop `tts` while pricing/envelope keep it.
+    engineConfig = body.clientTts === true
+      ? { ...config, tts: undefined }
+      : config;
+  } catch {
+    return NextResponse.json(
+      {
+        error: hasByo
+          ? "Invalid BYO configuration."
+          : "Generation provider unavailable.",
+      },
+      { status: hasByo ? 400 : 503 },
+    );
+  }
   const auth = await requireUser();
   if (auth instanceof NextResponse) return auth;
+  const sceneOperation = body.speculation?.mode === "prefetch"
+    ? "story.scene.prefetch"
+    : "story.scene";
   const billing = await prepareGenerationBilling({
     request: req,
     auth,
     requestedMode: body.credentialMode,
     hasByok: hasByo,
-    operation: body.speculation?.mode === "prefetch"
-      ? "story.scene.prefetch"
-      : "story.scene",
+    runtimeConfig: config,
+    operation: sceneOperation,
   });
   if (billing instanceof NextResponse) return billing;
+  let costBetaBilling = false;
+  try {
+    costBetaBilling = isCostBetaGenerationBilling(billing);
+  } catch (error) {
+    if (error instanceof PricingUnavailableError) {
+      return NextResponse.json(
+        { error: "Platform pricing unavailable.", code: error.code },
+        { status: error.status },
+      );
+    }
+    throw error;
+  }
 
   try {
-    if (hasByo) assertCompleteByok(body.byo);
-    const base = hasByo
-      ? buildByoEngineConfig(body.byo!, loadEngineConfig())
-      : loadEngineConfig();
-    const config = body.clientTts === true ? { ...base, tts: undefined } : base;
     const speculativeContext = getSpeculativeBranchContext(
       body.session,
       config,
@@ -121,15 +245,23 @@ export async function POST(req: Request) {
               cacheMeta,
               "api/scene",
               async () =>
-                cacheApiResponseImage(
-                  await requestScene(config, body, observe),
+                runSceneGeneration(
+                  billing,
+                  config,
+                  sceneOperation,
+                  () => requestScene(engineConfig, body, observe),
+                  costBetaBilling,
                 ),
             ),
         );
-        if (result.cache?.status === "hit") {
-          await refundGenerationBilling(billing, "Cache hit; reservation released.");
+        if (billing.providerOutcome === "not_started") {
+          await refundGenerationBilling(
+            billing,
+            "Cache hit; reservation released.",
+            { providerNotStarted: true },
+          );
         } else {
-          await settleGenerationBilling(billing);
+          await settleGenerationBilling(billing, { requestSignal: req.signal });
         }
         const knownNames = new Set(
           (body.session.characters ?? []).map((c) => c.name),
@@ -165,19 +297,32 @@ export async function POST(req: Request) {
                 cacheMeta,
                 "api/scene",
                 async () =>
-                  cacheApiResponseImage(
-                    await requestScene(config, body, (event) => {
-                      observe(event);
-                      emit(event);
-                    }),
+                  runSceneGeneration(
+                    billing,
+                    config,
+                    sceneOperation,
+                    () =>
+                      requestScene(
+                        engineConfig,
+                        body,
+                        (event) => {
+                          observe(event);
+                          emit(event);
+                        },
+                      ),
+                    costBetaBilling,
                   ),
                 emit,
               ),
           );
-          if (result.cache?.status === "hit") {
-            await refundGenerationBilling(billing, "Cache hit; reservation released.");
+          if (billing.providerOutcome === "not_started") {
+            await refundGenerationBilling(
+              billing,
+              "Cache hit; reservation released.",
+              { providerNotStarted: true },
+            );
           } else {
-            await settleGenerationBilling(billing);
+            await settleGenerationBilling(billing, { requestSignal: req.signal });
           }
           controller.enqueue(
             encoder.encode(
@@ -191,14 +336,13 @@ export async function POST(req: Request) {
             ),
           );
           controller.close();
-        } catch (err) {
+        } catch {
           await refundGenerationBilling(
             billing,
             "Generation failed before settlement.",
           ).catch(() => undefined);
-          const message = err instanceof Error ? err.message : "Unknown error";
           controller.enqueue(
-            encoder.encode(formatSSE({ type: "error", message })),
+            encoder.encode(formatSSE({ type: "error", message: "Generation failed." })),
           );
           controller.close();
         }
@@ -212,12 +356,11 @@ export async function POST(req: Request) {
         Connection: "keep-alive",
       },
     });
-  } catch (err) {
+  } catch {
     await refundGenerationBilling(
       billing,
       "Generation failed before settlement.",
     ).catch(() => undefined);
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Generation failed." }, { status: 500 });
   }
 }

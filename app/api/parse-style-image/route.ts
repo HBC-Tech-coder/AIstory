@@ -8,11 +8,15 @@ import { loadEngineConfig } from "@/lib/config";
 import { STYLE_EXTRACTION_PROMPT } from "@/lib/styleExtraction";
 import { requireUser } from "@/lib/supabase/guard";
 import {
+  markGenerationBillingOperationFailed,
+  markGenerationBillingProviderStarted,
+  markGenerationBillingProviderSucceeded,
   prepareGenerationBilling,
   refundGenerationBilling,
   settleGenerationBilling,
   type GenerationBillingContext,
 } from "@/lib/billing/generationGate";
+import { runInCostEnvelope } from "@/lib/billing/platformCostEnvelopeServer";
 
 export const runtime = "nodejs";
 
@@ -67,6 +71,23 @@ function optionalCharacters(value: unknown): ParseStyleImageResponse["characters
   return out.length ? out : undefined;
 }
 
+function buildPayload(
+  parsed: Record<string, unknown>,
+  stylePrompt: string,
+): ParseStyleImageResponse {
+  return {
+    stylePrompt,
+    storySeed: optionalString(parsed.storySeed),
+    subjectPrompt: optionalString(parsed.subjectPrompt),
+    characterPrompt: optionalString(parsed.characterPrompt),
+    scenePrompt: optionalString(parsed.scenePrompt),
+    setting: optionalString(parsed.setting),
+    mood: optionalString(parsed.mood),
+    props: optionalStringArray(parsed.props),
+    characters: optionalCharacters(parsed.characters),
+  };
+}
+
 export async function POST(req: Request) {
   let body: ParseStyleImageRequest;
   try {
@@ -91,6 +112,16 @@ export async function POST(req: Request) {
     );
   }
 
+  let config: ReturnType<typeof loadEngineConfig>;
+  try {
+    config = loadEngineConfig();
+  } catch {
+    return NextResponse.json(
+      { error: "Vision provider unavailable." },
+      { status: 503 },
+    );
+  }
+
   const auth = await requireUser();
   if (auth instanceof NextResponse) return auth;
   const preparedBilling = await prepareGenerationBilling({
@@ -98,47 +129,95 @@ export async function POST(req: Request) {
     auth,
     requestedMode: "platform_managed",
     hasByok: false,
+    runtimeConfig: config,
     operation: "vision.style-parse",
   });
   if (preparedBilling instanceof NextResponse) return preparedBilling;
   const billing: GenerationBillingContext = preparedBilling;
 
   try {
-    const config = loadEngineConfig();
-    const raw = await analyzeImageDataUrl(
-      config.vision,
-      body.imageDataUrl,
-      STYLE_EXTRACTION_PROMPT,
-    );
+    const isV2 = billing.reservation?.catalogEntry.pricingMode === "cost_beta_credit_v2";
+    const generate = async () => {
+      markGenerationBillingProviderStarted(billing);
+      return await analyzeImageDataUrl(
+        config.vision,
+        body.imageDataUrl,
+        STYLE_EXTRACTION_PROMPT,
+      );
+    };
+    let raw: string;
+    try {
+      if (isV2) {
+        raw = await runInCostEnvelope(config, "vision.style-parse", generate);
+      } else {
+        raw = await generate();
+      }
+    } catch (error) {
+      markGenerationBillingOperationFailed(billing);
+      throw error;
+    }
 
-    const parsed = parseVisionJson(raw);
-    const stylePrompt = optionalString(parsed.stylePrompt);
+    // v2 credits only settle when the raw vision output yields a usable style
+    // prompt. The parse/validation boundary is intentionally narrow so a
+    // settle or response failure below cannot be misread as unusable output.
+    let parsed: Record<string, unknown> | undefined;
+    let stylePrompt: string | undefined;
+    let v2ParseFailed = false;
+    if (isV2) {
+      try {
+        parsed = parseVisionJson(raw);
+        stylePrompt = optionalString(parsed.stylePrompt);
+      } catch {
+        v2ParseFailed = true;
+      }
+    }
+    const v2Usable = !v2ParseFailed && Boolean(stylePrompt);
+    if (!isV2 || v2Usable) {
+      markGenerationBillingProviderSucceeded(billing);
+    }
+    if (!isV2) {
+      // Legacy/v1 keeps the historical success-before-parse ordering and
+      // still settles an unusable parsed result before the application 502.
+      const legacyParsed = parseVisionJson(raw);
+      const legacyStylePrompt = optionalString(legacyParsed.stylePrompt);
+      if (!legacyStylePrompt) {
+        await settleGenerationBilling(billing, { requestSignal: req.signal });
+        return NextResponse.json(
+          { error: "Vision model returned an empty stylePrompt" },
+          { status: 502 },
+        );
+      }
+      const legacyPayload = buildPayload(legacyParsed, legacyStylePrompt);
+      await settleGenerationBilling(billing, { requestSignal: req.signal });
+      return NextResponse.json(legacyPayload);
+    }
+    if (v2ParseFailed) {
+      markGenerationBillingOperationFailed(billing);
+      await refundGenerationBilling(
+        billing,
+        "Style analysis failed before settlement.",
+      ).catch(() => undefined);
+      return NextResponse.json({ error: "Style analysis failed." }, { status: 500 });
+    }
     if (!stylePrompt) {
+      markGenerationBillingOperationFailed(billing);
+      await refundGenerationBilling(
+        billing,
+        "Style analysis failed before settlement.",
+      ).catch(() => undefined);
       return NextResponse.json(
         { error: "Vision model returned an empty stylePrompt" },
         { status: 502 },
       );
     }
-
-    const payload: ParseStyleImageResponse = {
-      stylePrompt,
-      storySeed: optionalString(parsed.storySeed),
-      subjectPrompt: optionalString(parsed.subjectPrompt),
-      characterPrompt: optionalString(parsed.characterPrompt),
-      scenePrompt: optionalString(parsed.scenePrompt),
-      setting: optionalString(parsed.setting),
-      mood: optionalString(parsed.mood),
-      props: optionalStringArray(parsed.props),
-      characters: optionalCharacters(parsed.characters),
-    };
-    await settleGenerationBilling(billing);
+    const payload = buildPayload(parsed!, stylePrompt);
+    await settleGenerationBilling(billing, { requestSignal: req.signal });
     return NextResponse.json(payload);
-  } catch (err) {
+  } catch {
     await refundGenerationBilling(
       billing,
       "Style analysis failed before settlement.",
     ).catch(() => undefined);
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Style analysis failed." }, { status: 500 });
   }
 }

@@ -69,6 +69,7 @@ try {
     now: startedAt,
     provider,
   });
+  assert.equal(blocked.retryAfterSeconds, 60);
   for (let attempt = 0; attempt < 5; attempt += 1) {
     await assert.rejects(
       verifyPhoneOtp(repository, {
@@ -99,8 +100,10 @@ try {
       now: startedAt + 30_000,
       provider,
     }),
-    (error: unknown) =>
-      error instanceof PhoneAuthError && error.code === "SMS_RATE_LIMITED",
+      (error: unknown) =>
+      error instanceof PhoneAuthError
+      && error.code === "SMS_RATE_LIMITED"
+      && error.retryAfterSeconds === 30,
   );
 
   const challenge = await requestPhoneOtp({
@@ -226,7 +229,8 @@ try {
   });
   assert.equal(reservationReplay.entry.id, reservation.entry.id);
   assert.equal(reservation.quote.estimatedCredits, 246);
-  await settlePlatformOperation(repository, reservation);
+  const catalogSettlement = await settlePlatformOperation(repository, reservation);
+  assert.equal(catalogSettlement.costSource, "price_catalog");
   const settledThenRefunded = await refundPlatformOperation(
     repository,
     reservation,
@@ -266,6 +270,61 @@ try {
     (await repository.listLedger(first.userId))
       .reduce((sum, entry) => sum + entry.amount, 0),
     754,
+  );
+
+  const lowerCostReservation = await reservePlatformOperation(repository, {
+    userId: first.userId,
+    operation: "story.start",
+    idempotencyKey: "generation:test:start:provider-lower",
+  });
+  const lowerCostSettlement = await settlePlatformOperation(
+    repository,
+    lowerCostReservation,
+    {
+      providerCostMinor: 100,
+      providerCurrency: "CNY",
+      providerMinorUnitScale: 2,
+    },
+  );
+  assert.equal(lowerCostSettlement.costSource, "provider_settlement");
+  assert.equal(lowerCostSettlement.settledCredits, 200);
+  assert.equal(lowerCostSettlement.amount, 46, "lower actual cost must refund the difference");
+
+  const higherCostReservation = await reservePlatformOperation(repository, {
+    userId: first.userId,
+    operation: "story.start",
+    idempotencyKey: "generation:test:start:provider-higher",
+  });
+  const higherCostSettlement = await settlePlatformOperation(
+    repository,
+    higherCostReservation,
+    {
+      providerCostMinor: 140,
+      providerCurrency: "CNY",
+      providerMinorUnitScale: 2,
+    },
+  );
+  assert.equal(higherCostSettlement.costSource, "provider_settlement");
+  assert.equal(higherCostSettlement.settledCredits, 280);
+  assert.equal(higherCostSettlement.amount, -34, "higher actual cost must charge the difference");
+
+  const mismatchedReceiptReservation = await reservePlatformOperation(repository, {
+    userId: first.userId,
+    operation: "story.start",
+    idempotencyKey: "generation:test:start:provider-currency-mismatch",
+  });
+  await assert.rejects(
+    settlePlatformOperation(repository, mismatchedReceiptReservation, {
+      providerCostMinor: 100,
+      providerCurrency: "USD",
+      providerMinorUnitScale: 2,
+    }),
+    /价格策略|回执|currency|settlement/i,
+  );
+  await refundPlatformOperation(
+    repository,
+    mismatchedReceiptReservation,
+    "provider receipt validation failed",
   );
 
   const racedReservation = await reservePlatformOperation(repository, {
@@ -323,12 +382,14 @@ try {
     requestedMode: "user_byok",
     hasByok: true,
     userId: "anonymous",
+    authType: "anonymous",
     env: { AISTORY_PLATFORM_BILLING_ENABLED: "true" },
   }).allowed, true);
   const anonymousPlatform = authorizeCredentialAccess({
     requestedMode: "platform_managed",
     hasByok: false,
     userId: "anonymous",
+    authType: "anonymous",
     env: { AISTORY_PLATFORM_BILLING_ENABLED: "true" },
   });
   assert.equal(anonymousPlatform.allowed, false);

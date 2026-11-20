@@ -1,5 +1,9 @@
 import OpenAI from "openai";
 import type { ChatStreamResult, ChatStreamUsage, ProviderConfig } from "@infiplot/types";
+import {
+  beginPlatformTextRequest,
+  type PlatformTextRequestPlan,
+} from "../billing/platformCostEnvelope";
 import { normalizeBaseUrl } from "./normalizeUrl";
 
 export type ChatMessage = {
@@ -116,6 +120,19 @@ function makeClient(
   });
 }
 
+/**
+ * Platform cost envelope payload: caps output tokens and disables provider
+ * thinking. Outside a platform scope this is empty, so BYOK requests are
+ * byte-for-byte unchanged.
+ */
+function platformPlanFields(
+  plan: PlatformTextRequestPlan | undefined,
+): { max_tokens?: number; enable_thinking?: boolean } {
+  return plan
+    ? { max_tokens: plan.maxTokens, enable_thinking: plan.enableThinking }
+    : {};
+}
+
 export async function chat(
   config: ProviderConfig,
   messages: ChatMessage[],
@@ -126,6 +143,9 @@ export async function chat(
     allowServerProxyFallback?: boolean;
   },
 ): Promise<string> {
+  // Consumes one platform attempt synchronously, before any HTTP request.
+  // Returns undefined for BYOK / unbound config, which leaves the call unchanged.
+  const platformPlan = beginPlatformTextRequest(config, messages);
   const client = makeClient(config, opts?.allowServerProxyFallback !== false);
 
   const completion = await client.chat.completions.create({
@@ -136,6 +156,7 @@ export async function chat(
     })),
     temperature: opts?.temperature ?? 0.9,
     stream: false,
+    ...platformPlanFields(platformPlan),
   });
 
   const text = completion.choices[0]?.message?.content ?? "";
@@ -181,6 +202,10 @@ export function chatStream(
   const usage = new Promise<ChatStreamUsage | undefined>((r) => { resolveUsage = r; });
 
   const textStream = (async function* (): AsyncIterable<string> {
+    // One platform attempt per physical request. The streaming request and the
+    // non-streaming degrade path each consume separately.
+    let platformPlan = beginPlatformTextRequest(config, messages);
+    let yieldedAny = false;
     try {
       const stream = await client.chat.completions.create({
         model: config.model,
@@ -188,11 +213,15 @@ export function chatStream(
         temperature: opts?.temperature ?? 0.9,
         stream: true,
         stream_options: { include_usage: true },
+        ...platformPlanFields(platformPlan),
       });
 
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta?.content;
-        if (delta) yield delta;
+        if (delta) {
+          yieldedAny = true;
+          yield delta;
+        }
 
         if (chunk.usage) {
           const u: ChatStreamUsage = {
@@ -209,6 +238,20 @@ export function chatStream(
       // If usage was never emitted (provider omitted it), resolve undefined.
       resolveUsage!(undefined);
     } catch (err) {
+      if (platformPlan) {
+        // In a platform scope, never issue a second physical request after any
+        // partial output, and never exceed the shared attempt budget.
+        if (yieldedAny) {
+          resolveUsage!(undefined);
+          throw err;
+        }
+        try {
+          platformPlan = beginPlatformTextRequest(config, messages);
+        } catch (budgetErr) {
+          resolveUsage!(undefined);
+          throw budgetErr;
+        }
+      }
       // Streaming not supported by provider → degrade to buffered call.
       console.warn(
         `[chatStream] streaming failed, degrading to non-streaming:`,
@@ -220,6 +263,7 @@ export function chatStream(
           messages: msgPayload,
           temperature: opts?.temperature ?? 0.9,
           stream: false,
+          ...platformPlanFields(platformPlan),
         });
         const text = completion.choices[0]?.message?.content ?? "";
         if (text) yield text;

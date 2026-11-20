@@ -1,0 +1,65 @@
+\set ON_ERROR_STOP on
+-- Verify this envelope and its migration SHA from the frozen manifest before use.
+begin;
+set local search_path=pg_catalog;
+set local check_function_bodies=on;
+set local plpgsql.extra_errors='shadowed_variables';
+select pg_advisory_xact_lock(20261115,150000);
+lock table supabase_migrations.schema_migrations in share row exclusive mode;
+do $preflight$
+declare v_ledger oid:='supabase_migrations.schema_migrations'::regclass; v_columns jsonb;
+begin
+  if current_user<>'postgres' or session_user<>'postgres'
+    or not exists(select 1 from pg_database where datname=current_database() and datdba='postgres'::regrole)
+    or not exists(select 1 from pg_class where oid=v_ledger and relkind='r' and relpersistence='p' and relowner='postgres'::regrole)
+    or exists(select 1 from pg_class c,lateral aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a
+      where c.oid=v_ledger and a.grantee<>'postgres'::regrole)
+    or exists(select 1 from pg_attribute a,lateral aclexplode(a.attacl) x
+      where a.attrelid=v_ledger and x.grantee<>'postgres'::regrole) then
+    raise exception 'LINKED_BILLING_LEDGER_OWNER_REJECTED'; end if;
+  select jsonb_agg(jsonb_build_array(a.attnum,a.attname,format_type(a.atttypid,a.atttypmod),a.attnotnull,
+    a.attidentity,a.attgenerated,pg_get_expr(d.adbin,d.adrelid)) order by a.attnum) into v_columns
+    from pg_attribute a left join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
+    where a.attrelid=v_ledger and a.attnum>0 and not a.attisdropped;
+  if v_columns is distinct from '[[1,"version","text",true,"","",null],[2,"name","text",true,"","",null],[3,"sha256","text",true,"","",null],[4,"applied_at","timestamp with time zone",true,"","","now()"]]'::jsonb
+    or (select count(*) from pg_constraint where conrelid=v_ledger)<>1
+    or not exists(select 1 from pg_constraint where conrelid=v_ledger and contype='p' and conkey=array[1]::smallint[] and convalidated and not condeferrable)
+    or exists(select 1 from pg_trigger where tgrelid=v_ledger and not tgisinternal)
+    or exists(select 1 from pg_rewrite where ev_class=v_ledger) then raise exception 'LINKED_BILLING_LEDGER_SHAPE_REJECTED'; end if;
+  perform 1 from supabase_migrations.schema_migrations where version in ('20260811193000','20260901040000') for update;
+  if (select count(*) from supabase_migrations.schema_migrations where version='20260811193000'
+      and name collate "C"='20260811193000_production_video_asset_metadata_gate.sql' collate "C"
+      and sha256 collate "C"='2b506307e1b5e42a16ca79d4c3973e44d410cdd00d4228faed012252b3960dc6' collate "C"
+      and applied_at is not null)<>1
+    or (select count(*) from supabase_migrations.schema_migrations where version='20260901040000'
+      and name collate "C"='20260901040000_aiuser_account_link_gate.sql' collate "C"
+      and sha256 collate "C"='da47fb94396b290e4c00d515e5d8039f010113d87307e2ff5298079a66bf3bec' collate "C"
+      and applied_at is not null)<>1
+    or exists(select 1 from supabase_migrations.schema_migrations where version='20261115000000')
+    or public.aistory_database_gate_status() is distinct from '20260811193000'
+    or public.aistory_aiuser_link_posture() is distinct from '20260901040000'
+    or exists(select 1 from public.aistory_schema_gates where gate_name='aiuser_linked_billing') then
+    raise exception 'LINKED_BILLING_LEDGER_PREDECESSOR_REJECTED'; end if;
+end;
+$preflight$;
+\ir ../supabase/migrations/20261115000000_aiuser_linked_billing_gate.sql
+insert into supabase_migrations.schema_migrations(version,name,sha256) values
+('20261115000000','20261115000000_aiuser_linked_billing_gate.sql','8c92aec6aa0b5f5b6bf83aa00d6774f73a13a08d60da6822350c04c1a09819fa');
+do $postflight$
+begin
+  if public.aistory_aiuser_linked_billing_posture() is distinct from '20261115000000'
+    or public.aistory_aiuser_link_posture() is distinct from '20260901040000'
+    or public.aistory_database_gate_status() is distinct from '20260811193000'
+    or (select count(*) from supabase_migrations.schema_migrations where version='20261115000000'
+      and name='20261115000000_aiuser_linked_billing_gate.sql'
+      and sha256='8c92aec6aa0b5f5b6bf83aa00d6774f73a13a08d60da6822350c04c1a09819fa'
+      and applied_at is not null)<>1
+    or (select count(*) from supabase_migrations.schema_migrations where version='20260901040000'
+      and name='20260901040000_aiuser_account_link_gate.sql'
+      and sha256='da47fb94396b290e4c00d515e5d8039f010113d87307e2ff5298079a66bf3bec'
+      and applied_at is not null)<>1 then
+    raise exception 'LINKED_BILLING_LEDGER_POSTFLIGHT_REJECTED'; end if;
+end;
+$postflight$;
+commit;
+\echo PASS_AIUSER_LINKED_BILLING_ATOMIC_LEDGER

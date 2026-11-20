@@ -1,0 +1,35 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false
+  },
+  "include": [
+    "next-env.d.ts",
+    "types/**/*.d.ts",
+    "lib/billing/creditCards.ts",
+    "lib/billing/creditCardsServer.ts",
+    "lib/admin/independentPrincipal.ts",
+    "lib/admin/independentPrincipalRepository.ts",
+    "lib/admin/independentPrincipalServer.ts",
+    "lib/auth/userSession.ts",
+    "lib/production/databaseGate.ts",
+    "lib/supabase/guard.ts",
+    "app/api/admin/credit-cards/route.ts",
+    "app/api/account/credit-cards/redeem/route.ts",
+    "app/admin/credit-cards/page.tsx",
+    "app/[locale]/account/credit-card/page.tsx",
+    "components/AdminCreditCardPanel.tsx",
+    "components/CreditCardRedeemPanel.tsx",
+    "scripts/test-credit-card-gate.ts",
+    "scripts/test-credit-card-ui.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    ".tmp",
+    "app/app",
+    "components/components",
+    "lib/lib"
+  ]
+}

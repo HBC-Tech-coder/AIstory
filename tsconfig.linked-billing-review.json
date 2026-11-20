@@ -1,0 +1,37 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "noEmit": true,
+    "paths": {
+      "@/*": ["./*", "D:/AIstory/.tmp/sharing-proxy-build-20261114/*"],
+      "@infiplot/engine": ["D:/AIstory/.tmp/sharing-proxy-build-20261114/lib/engine/index.ts"],
+      "@infiplot/ai-client": ["D:/AIstory/.tmp/sharing-proxy-build-20261114/lib/ai-client/index.ts"],
+      "@infiplot/tts-client": ["D:/AIstory/.tmp/sharing-proxy-build-20261114/lib/tts-client/index.ts"],
+      "@infiplot/types": ["D:/AIstory/.tmp/sharing-proxy-build-20261114/lib/types/index.ts"]
+    }
+  },
+  "include": [
+    "lib/auth/aiUserLinkedBillingConfig.ts",
+    "lib/auth/aiUserLinkedBillingRepository.ts",
+    "lib/auth/aiUserAccountPublic.ts",
+    "lib/auth/aiUserAccountLinkReauthServer.ts",
+    "lib/auth/aiUserOidcCallback.ts",
+    "lib/auth/aiUserProductSession.ts",
+    "lib/auth/aiUserOidcCallbackServer.ts",
+    "lib/billing/linkedBillingIdentity.ts",
+    "lib/billing/linkedBillingServer.ts",
+    "lib/billing/generationGate.ts",
+    "lib/credentials/serverPolicy.ts",
+    "app/api/account/me/route.ts",
+    "app/api/account/generation-readiness/route.ts",
+    "app/api/auth/aiuser/account-link/reauth/route.ts",
+    "app/api/auth/aiuser/capabilities/route.ts",
+    "app/api/speculative-branch/route.ts",
+    "app/api/tts-provider/route.ts",
+    "components/AiUserAccountPanel.tsx",
+    "scripts/test-aiuser-linked-billing-ledger.ts",
+    "scripts/test-aiuser-user-integration.ts"
+  ],
+  "exclude": ["node_modules", "next-docs-snapshot", "app/app", "components/components", "lib/lib"]
+}

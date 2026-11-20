@@ -17,12 +17,20 @@ import {
   validateComfyUIWorkflowRequest,
 } from "./validation";
 import {
-  getComfyUIWorkflowTemplate,
+  getComfyUIWorkflowTemplateVersion,
   listComfyUIWorkflowTemplates,
 } from "./registry";
+import type { ComfyUIWorkflowVersionSelection } from "./registry";
 import { requestComfyUI } from "./transport";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:8188";
+
+export class ComfyUIWorkflowSelectionUnavailableError extends Error {
+  constructor() {
+    super("Pinned ComfyUI workflow selection is unavailable.");
+    this.name = "ComfyUIWorkflowSelectionUnavailableError";
+  }
+}
 
 function readWorkflowJson(value: string | undefined): ComfyUIWorkflowConfig | undefined {
   if (!value?.trim()) return undefined;
@@ -347,17 +355,19 @@ export async function queueComfyUIWorkflow(
 }
 
 export async function queueRegisteredComfyUIWorkflow(
-  workflowId: string,
+  selection: ComfyUIWorkflowVersionSelection,
   request: ComfyUIWorkflowRequest,
   fetcher: typeof fetch = fetch,
-): Promise<ComfyUIQueuedJob> {
+): Promise<ComfyUIQueuedJob & { outputNodeIds: string[] }> {
   const requestValidation = validateComfyUIWorkflowRequest(request);
   if (!requestValidation.ok) {
     throw new Error(requestValidation.issues.map((item) => item.message).join(" "));
   }
-  const registered = await getComfyUIWorkflowTemplate(workflowId);
+  const registered = await getComfyUIWorkflowTemplateVersion(selection).catch(
+    () => undefined,
+  );
   if (!registered || registered.template.modality !== request.modality) {
-    throw new Error("ComfyUI workflow template is unavailable for this modality.");
+    throw new ComfyUIWorkflowSelectionUnavailableError();
   }
   const base = getComfyUIProviderConfig();
   const config: ComfyUIProviderConfig = {
@@ -372,11 +382,15 @@ export async function queueRegisteredComfyUIWorkflow(
   if (!config.enabled || !configValidation.ok) {
     throw new Error("ComfyUI provider 未启用或注册 workflow 配置无效。");
   }
-  return queueWithConfig(
+  const queued = await queueWithConfig(
     request,
     config,
     registered.version.workflow,
     fetcher,
     { id: registered.template.id, version: registered.version.version },
   );
+  return {
+    ...queued,
+    outputNodeIds: [...registered.version.workflow.outputNodeIds],
+  };
 }

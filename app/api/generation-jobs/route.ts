@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getGenerationJobScheduler } from "@/lib/generation-jobs/server";
+import { canSubmitComfyUIGeneration } from "@/lib/generation-jobs/preflight";
 import type {
   ComfyUIGenerationJobInput,
   LocalMiniDramaImageJobInput,
@@ -42,10 +43,22 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
     if (body.provider === "comfyui") {
-      const status = await discoverComfyUIProviderStatus();
-      if (status.state !== "ready" || !status.modalities.image) {
+      const input = body.input as ComfyUIGenerationJobInput;
+      if (input.modality !== "image" && input.modality !== "video") {
         return NextResponse.json(
-          { error: "ComfyUI 图片引擎当前不可用。" },
+          { error: "Generation modality is invalid." },
+          { status: 400 },
+        );
+      }
+      const status = await discoverComfyUIProviderStatus();
+      if (!canSubmitComfyUIGeneration(status, input)) {
+        return NextResponse.json(
+          {
+            error:
+              input.modality === "video"
+                ? "ComfyUI 视频引擎当前不可用。"
+                : "ComfyUI 图片引擎当前不可用。",
+          },
           { status: 503 },
         );
       }

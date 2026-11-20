@@ -67,10 +67,15 @@ export type SlimStoryBlob = {
   session: Session;
 };
 
-/** One row in the browser-local IndexedDB store (object store keyPath = "id").
+/** One row in the browser-local IndexedDB `stories_v2` store (keyPath =
+ *  `storageKey`).
  *  Carries the slim session payload plus the local-first sync-reserved
  *  metadata so cloud sync can be layered on next phase without restructuring. */
 export type StoryRecord = {
+  /** Physical IndexedDB key. Namespaces prevent anonymous/account collisions. */
+  storageKey: string;
+  /** `"anonymous"` or the stable UUID account that owns this browser record. */
+  ownerNamespace: string;
   id: string;
   /** = STORY_SCHEMA_VERSION at write time. */
   schemaVersion: number;

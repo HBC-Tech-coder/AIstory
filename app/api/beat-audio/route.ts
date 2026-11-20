@@ -8,10 +8,14 @@ import {
   withTtsCache,
 } from "@/lib/engine/ttsCache";
 import {
+  markGenerationBillingOperationFailed,
+  markGenerationBillingProviderStarted,
+  markGenerationBillingProviderSucceeded,
   prepareGenerationBilling,
   refundGenerationBilling,
   settleGenerationBilling,
 } from "@/lib/billing/generationGate";
+import { runInCostEnvelope } from "@/lib/billing/platformCostEnvelopeServer";
 import { requireUser } from "@/lib/supabase/guard";
 
 export const runtime = "nodejs";
@@ -37,8 +41,14 @@ export async function POST(req: Request) {
   const hasFallback =
     !!body.stepfunVoiceId || !!body.voiceDescription || !!body.voiceProfile;
   if (
-    !body.beat?.id ||
-    !body.beat?.line ||
+    typeof body.beat?.id !== "string" ||
+    !body.beat.id.trim() ||
+    typeof body.beat.line !== "string" ||
+    !body.beat.line.trim() ||
+    (body.beat.lineDelivery != null && typeof body.beat.lineDelivery !== "string") ||
+    (body.voiceDescription != null && typeof body.voiceDescription !== "string") ||
+    (body.characterName != null && typeof body.characterName !== "string") ||
+    (body.stepfunVoiceId != null && typeof body.stepfunVoiceId !== "string") ||
     hasInvalidVoiceProvider ||
     (!hasVoice && !hasFallback)
   ) {
@@ -50,17 +60,38 @@ export async function POST(req: Request) {
 
   try {
     const config = loadEngineConfig();
-    const cacheMeta = beatAudioCacheKey(config.tts, body);
+    const billingBody: BeatAudioRequest = config.tts
+      && (body.voice?.provider === "stepfun" || body.voice?.provider === "bailian")
+      ? {
+          ...body,
+          voice: {
+            ...body.voice,
+            model: config.tts.speechModel,
+          },
+        }
+      : body;
+    const cacheMeta = beatAudioCacheKey(config.tts, billingBody);
     const cached = await peekTtsCache(cacheMeta);
     if (cached?.audio) {
       const binary = Buffer.from(cached.audio.base64, "base64");
-      return new Response(binary, {
+      const audio = new Uint8Array(binary.byteLength);
+      audio.set(binary);
+      return new Response(audio, {
         headers: {
           "Content-Type": cached.audio.mime,
           "X-AIstory-TTS-Cache": "hit",
           ...(cacheMeta.key
             ? { "X-AIstory-TTS-Cache-Key": cacheMeta.key.slice(0, 12) }
             : {}),
+        },
+      });
+    }
+    if (!config.tts) {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "X-AIstory-TTS-Cache": "skip",
+          "X-AIstory-TTS-Cache-Reason": "tts-disabled",
         },
       });
     }
@@ -71,42 +102,73 @@ export async function POST(req: Request) {
       auth,
       requestedMode: "platform_managed",
       hasByok: false,
+      runtimeConfig: config,
       operation: "tts.beat",
     });
     if (billing instanceof NextResponse) return billing;
     try {
-    const result = await withTtsCache(
-      cacheMeta,
-      "api/beat-audio",
-      () => requestBeatAudio(config, body),
-    );
-    if (result.cache.status === "hit" || !result.audio) {
-      await refundGenerationBilling(
-        billing,
-        result.cache.status === "hit"
-          ? "Cache hit; reservation released."
-          : "No audio produced; reservation released.",
+      const result = await withTtsCache(
+        cacheMeta,
+        "api/beat-audio",
+        async () => {
+          const generate = async () => {
+            return await requestBeatAudio(config, billingBody, {
+              onProviderStarted: () => {
+                markGenerationBillingProviderStarted(billing);
+              },
+            });
+          };
+          let generated: Awaited<ReturnType<typeof requestBeatAudio>>;
+          try {
+            if (billing.reservation?.catalogEntry.pricingMode === "cost_beta_credit_v2") {
+              generated = await runInCostEnvelope(config, "tts.beat", generate);
+            } else {
+              generated = await generate();
+            }
+          } catch (error) {
+            markGenerationBillingOperationFailed(billing);
+            throw error;
+          }
+          if (generated.audio) {
+            markGenerationBillingProviderSucceeded(billing);
+          } else {
+            markGenerationBillingOperationFailed(billing);
+          }
+          return generated;
+        },
       );
-    } else {
-      await settleGenerationBilling(billing);
-    }
-    if (!result.audio) {
-      return new Response(null, {
-        status: 204,
+      if (result.cache.status === "hit" || !result.audio) {
+        await refundGenerationBilling(
+          billing,
+          result.cache.status === "hit"
+            ? "Cache hit; reservation released."
+            : "No audio produced; reservation released.",
+          result.cache.status === "hit"
+            ? { providerNotStarted: true }
+            : undefined,
+        );
+      } else {
+        await settleGenerationBilling(billing, { requestSignal: req.signal });
+      }
+      if (!result.audio) {
+        return new Response(null, {
+          status: 204,
+          headers: {
+            "X-AIstory-TTS-Cache": result.cache.status,
+            ...(result.cache.reason ? { "X-AIstory-TTS-Cache-Reason": result.cache.reason } : {}),
+          },
+        });
+      }
+      const binary = Buffer.from(result.audio.base64, "base64");
+      const audio = new Uint8Array(binary.byteLength);
+      audio.set(binary);
+      return new Response(audio, {
         headers: {
+          "Content-Type": result.audio.mime,
           "X-AIstory-TTS-Cache": result.cache.status,
-          ...(result.cache.reason ? { "X-AIstory-TTS-Cache-Reason": result.cache.reason } : {}),
+          ...(result.cache.key ? { "X-AIstory-TTS-Cache-Key": result.cache.key.slice(0, 12) } : {}),
         },
       });
-    }
-    const binary = Buffer.from(result.audio.base64, "base64");
-    return new Response(binary, {
-      headers: {
-        "Content-Type": result.audio.mime,
-        "X-AIstory-TTS-Cache": result.cache.status,
-        ...(result.cache.key ? { "X-AIstory-TTS-Cache-Key": result.cache.key.slice(0, 12) } : {}),
-      },
-    });
     } catch (error) {
       await refundGenerationBilling(
         billing,
@@ -114,11 +176,10 @@ export async function POST(req: Request) {
       ).catch(() => undefined);
       throw error;
     }
-  } catch (err) {
+  } catch {
     // Engine already swallows synth errors and returns audio:null. Anything
-    // that reaches here is config-level — surface so the client can log it.
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    // that reaches here is returned as a fixed, non-sensitive route error.
+    return NextResponse.json({ error: "TTS unavailable." }, { status: 503 });
   }
 }
 

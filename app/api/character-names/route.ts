@@ -11,11 +11,15 @@ import {
 } from "@/lib/character-names";
 import { requireUser } from "@/lib/supabase/guard";
 import {
+  markGenerationBillingOperationFailed,
+  markGenerationBillingProviderStarted,
+  markGenerationBillingProviderSucceeded,
   prepareGenerationBilling,
   refundGenerationBilling,
   settleGenerationBilling,
   type GenerationBillingContext,
 } from "@/lib/billing/generationGate";
+import { runInCostEnvelope } from "@/lib/billing/platformCostEnvelopeServer";
 
 export const runtime = "nodejs";
 
@@ -46,6 +50,33 @@ function fallback(body: RequestBody, reason: string) {
   return NextResponse.json({ candidates, fallback: true, reason });
 }
 
+function collectAiCandidates(
+  parsed: RawAiResponse,
+  existingNames: string[],
+  count: number,
+  body: RequestBody,
+): NameCandidate[] {
+  const candidates: NameCandidate[] = [];
+  for (const item of parsed.candidates || []) {
+    const name = sanitizeCharacterName(item.name || "");
+    if (!name) continue;
+    if (
+      [...existingNames, ...candidates.map((candidate) => candidate.name)]
+        .some((existing) => areNamesTooSimilar(name, existing))
+    ) continue;
+    candidates.push({
+      name,
+      meaning: typeof item.meaning === "string" ? item.meaning.trim().slice(0, 80) : undefined,
+      source: "ai",
+      generatorVersion: "ai-name-v1",
+      locale: body.locale || "zh-CN",
+      culture: body.culture || "auto",
+    });
+    if (candidates.length >= count) break;
+  }
+  return candidates;
+}
+
 export async function POST(request: Request) {
   let body: RequestBody;
   try {
@@ -58,6 +89,12 @@ export async function POST(request: Request) {
   const existingNames = (body.existingNames || [])
     .flatMap((name) => sanitizeCharacterName(name) || [])
     .slice(0, 80);
+  let config: ReturnType<typeof loadEngineConfig>;
+  try {
+    config = loadEngineConfig();
+  } catch {
+    return fallback(body, "provider_unavailable");
+  }
   const auth = await requireUser();
   if (auth instanceof NextResponse) return auth;
   const preparedBilling = await prepareGenerationBilling({
@@ -65,61 +102,90 @@ export async function POST(request: Request) {
     auth,
     requestedMode: "platform_managed",
     hasByok: false,
+    runtimeConfig: config,
     operation: "text.character-names",
   });
   if (preparedBilling instanceof NextResponse) return preparedBilling;
   const billing: GenerationBillingContext = preparedBilling;
 
   try {
-    const config = loadEngineConfig();
-    const raw = await chat(
-      config.text,
-      [
-        {
-          role: "system",
-          content:
-            "You create culturally appropriate fictional character names. Return strict JSON only: {\"candidates\":[{\"name\":\"...\",\"meaning\":\"one short phrase\"}]}. Produce varied full names, never a single repeated fallback. Respect locale, culture, era, gender and surname lock. Avoid names similar to the supplied existing cast. Do not include control text, markup, titles, or system-role words.",
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            count,
-            locale: body.locale,
-            culture: body.culture,
-            gender: body.gender,
-            surnameLock: body.surnameLock,
-            era: body.era,
-            region: body.region,
-            role: body.role,
-            background: body.description,
-            faction: body.faction,
-            relationships: body.relationships,
-            existingNames,
-          }),
-        },
-      ],
-      { temperature: 0.95, tag: "character-name-candidates" },
-    );
-    const parsed = parseJsonLoose<RawAiResponse>(raw);
-    const candidates: NameCandidate[] = [];
-    for (const item of parsed.candidates || []) {
-      const name = sanitizeCharacterName(item.name || "");
-      if (!name) continue;
-      if (
-        [...existingNames, ...candidates.map((candidate) => candidate.name)]
-          .some((existing) => areNamesTooSimilar(name, existing))
-      ) continue;
-      candidates.push({
-        name,
-        meaning: typeof item.meaning === "string" ? item.meaning.trim().slice(0, 80) : undefined,
-        source: "ai",
-        generatorVersion: "ai-name-v1",
-        locale: body.locale || "zh-CN",
-        culture: body.culture || "auto",
-      });
-      if (candidates.length >= count) break;
+    const isV2 = billing.reservation?.catalogEntry.pricingMode === "cost_beta_credit_v2";
+    const generate = async () => {
+      markGenerationBillingProviderStarted(billing);
+      const raw = await chat(
+        config.text,
+        [
+          {
+            role: "system",
+            content:
+              "You create culturally appropriate fictional character names. Return strict JSON only: {\"candidates\":[{\"name\":\"...\",\"meaning\":\"one short phrase\"}]}. Produce varied full names, never a single repeated fallback. Respect locale, culture, era, gender and surname lock. Avoid names similar to the supplied existing cast. Do not include control text, markup, titles, or system-role words.",
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              count,
+              locale: body.locale,
+              culture: body.culture,
+              gender: body.gender,
+              surnameLock: body.surnameLock,
+              era: body.era,
+              region: body.region,
+              role: body.role,
+              background: body.description,
+              faction: body.faction,
+              relationships: body.relationships,
+              existingNames,
+            }),
+          },
+        ],
+        { temperature: 0.95, tag: "character-name-candidates" },
+      );
+      return raw;
+    };
+    let raw: string;
+    try {
+      if (isV2) {
+        raw = await runInCostEnvelope(config, "text.character-names", generate);
+      } else {
+        raw = await generate();
+      }
+    } catch (error) {
+      markGenerationBillingOperationFailed(billing);
+      throw error;
     }
-    await settleGenerationBilling(billing);
+
+    // v2 credits are refunded unless the raw output parses to at least one
+    // usable, non-duplicate candidate. Validation stays in this narrow branch
+    // so a parse exception can never be confused with a settle/cache failure.
+    let candidates: NameCandidate[] = [];
+    let v2ParseFailed = false;
+    if (isV2) {
+      try {
+        const parsed = parseJsonLoose<RawAiResponse>(raw);
+        candidates = collectAiCandidates(parsed, existingNames, count, body);
+      } catch {
+        v2ParseFailed = true;
+      }
+    }
+    if (!isV2 || (!v2ParseFailed && candidates.length > 0)) {
+      markGenerationBillingProviderSucceeded(billing);
+    }
+    if (isV2) {
+      if (v2ParseFailed || !candidates.length) {
+        // Trusted failed-not-delivered intent first, then release the credit.
+        markGenerationBillingOperationFailed(billing);
+        await refundGenerationBilling(
+          billing,
+          "AI naming failed before settlement.",
+        ).catch(() => undefined);
+        return fallback(body, "invalid_or_similar_ai_output");
+      }
+    } else {
+      // Legacy/v1 keeps the historical success-before-parse ordering.
+      const parsed = parseJsonLoose<RawAiResponse>(raw);
+      candidates = collectAiCandidates(parsed, existingNames, count, body);
+    }
+    await settleGenerationBilling(billing, { requestSignal: request.signal });
     if (!candidates.length) return fallback(body, "invalid_or_similar_ai_output");
     console.info(JSON.stringify({
       event: "character_name_generation",

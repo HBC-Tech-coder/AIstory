@@ -27,8 +27,32 @@ pids
 .aistory-comfyui
 .aistory-jobs
 .aistory-assets
+.aistory-video-assets
+.aistory-video-stories
+.aistory-video-ab
+.aistory-gpu-coordinator-lab
+.aistory-gpu
 .test-asset-continuity-*
 .test-project-assets-*
+
+# Local review/executor artifacts and generated release evidence are not
+# maintainable product source and may contain machine-specific paths.
+/.tmp-doc-review/
+/deepseek-tasks/
+/deploy/
+/release-evidence/
+/qa/
+/integration.patch
+/*.obj
+
+# Large generated demo videos stay in local/object storage; Git keeps their
+# manifests, posters, and story metadata only.
+/public/case-studies/*/assets/*.mp4
+
+# Guard against accidental recursive workspace copies.
+/app/app/
+/components/components/
+/lib/lib/
 
 .open-next
 .wrangler
@@ -66,10 +90,10 @@ users.md
 
 # Local source material, review renders, and generated delivery packages stay
 # off GitHub. Runtime-safe derived case assets live under public/case-studies.
-content
+/content/
 /Downloads/
 /docs
-experiments
+/experiments/
 
 # Local model/workflow archives can be many gigabytes and are never source.
 /*.rar

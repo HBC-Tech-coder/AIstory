@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/supabase/guard";
+import {
+  rejectUnboundCloudProgressPrincipal,
+  requireUser,
+} from "@/lib/supabase/guard";
 import { cloudPullBlobs } from "@/lib/persistence/cloudStore";
 
 export const runtime = "nodejs";
@@ -14,6 +17,8 @@ const MAX_PULL_IDS = 200;
 export async function POST(req: Request) {
   const auth = await requireUser();
   if (auth instanceof NextResponse) return auth;
+  const principalRejection = rejectUnboundCloudProgressPrincipal(auth);
+  if (principalRejection) return principalRejection;
 
   let body: { ids?: unknown };
   try {

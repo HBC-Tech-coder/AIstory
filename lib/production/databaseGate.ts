@@ -1,16 +1,27 @@
 import "server-only";
 
-import { createClient } from "@supabase/supabase-js";
+import {
+  createClient,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
 
-export const PRODUCTION_IDENTITY_DB_GATE_VERSION = "20260729093000";
+export const PRODUCTION_IDENTITY_DB_GATE_VERSION = "20260811193000";
 
-export type ProductionDatabaseCapability = "identity" | "sms" | "billing";
+export type ProductionDatabaseCapability =
+  | "identity"
+  | "sms"
+  | "billing"
+  | "credentials"
+  | "video_assets";
 
-type DatabaseGateEnvironment = Partial<Record<
+export type DatabaseGateEnvironment = Partial<Record<
   | "AISTORY_PRODUCTION_IDENTITY_ENABLED"
   | "AISTORY_IDENTITY_REPOSITORY"
   | "AISTORY_ADMIN_REPOSITORY"
   | "AISTORY_DATABASE_GATE_VERSION"
+  | "AISTORY_ANONYMOUS_SESSION_SECRET"
+  | "AISTORY_ANONYMOUS_SUBJECT_PEPPER"
+  | "AISTORY_SUPABASE_SERVER_URL"
   | "NEXT_PUBLIC_SUPABASE_URL"
   | "SUPABASE_SERVICE_ROLE_KEY",
   string | undefined
@@ -24,6 +35,8 @@ export type ProductionDatabaseGateStatus = {
     | "identity_repository"
     | "admin_repository"
     | "database_gate_version"
+    | "anonymous_session_secret"
+    | "anonymous_subject_pepper"
     | "supabase_url"
     | "service_role"
   >;
@@ -58,7 +71,13 @@ export function inspectProductionDatabaseGate(
   ) {
     missing.push("database_gate_version");
   }
-  if (!env.NEXT_PUBLIC_SUPABASE_URL?.trim()) {
+  if ((env.AISTORY_ANONYMOUS_SESSION_SECRET?.trim().length || 0) < 32) {
+    missing.push("anonymous_session_secret");
+  }
+  if ((env.AISTORY_ANONYMOUS_SUBJECT_PEPPER?.trim().length || 0) < 32) {
+    missing.push("anonymous_subject_pepper");
+  }
+  if (!getProductionSupabaseServerUrl(env)) {
     missing.push("supabase_url");
   }
   if (!env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
@@ -69,6 +88,72 @@ export function inspectProductionDatabaseGate(
     expectedVersion: PRODUCTION_IDENTITY_DB_GATE_VERSION,
     missing,
   };
+}
+
+export function getProductionSupabaseServerUrl(
+  env: DatabaseGateEnvironment = process.env as DatabaseGateEnvironment,
+): string {
+  return (
+    env.AISTORY_SUPABASE_SERVER_URL?.trim()
+    || env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+    || ""
+  );
+}
+
+function sameOrigin(left: URL, right: URL): boolean {
+  return left.protocol === right.protocol
+    && left.hostname === right.hostname
+    && left.port === right.port;
+}
+
+export function rewriteSupabaseRestUrlForPostgrestRoot(
+  requestUrl: string | URL,
+  supabaseServerUrl = getProductionSupabaseServerUrl(),
+): string {
+  const configured = new URL(supabaseServerUrl);
+  const rewritten = new URL(requestUrl.toString());
+  if (sameOrigin(rewritten, configured)) {
+    if (rewritten.pathname === "/rest/v1") {
+      rewritten.pathname = "/";
+    } else if (rewritten.pathname.startsWith("/rest/v1/")) {
+      rewritten.pathname = rewritten.pathname.slice("/rest/v1".length);
+    }
+  }
+  return rewritten.toString();
+}
+
+function createPostgrestRootFetch(
+  supabaseServerUrl = getProductionSupabaseServerUrl(),
+): typeof fetch {
+  return async (input, init) => {
+    const requestUrl = typeof input === "string" || input instanceof URL
+      ? input
+      : input.url;
+    const rewrittenUrl = rewriteSupabaseRestUrlForPostgrestRoot(
+      requestUrl,
+      supabaseServerUrl,
+    );
+    if (input instanceof Request) {
+      return fetch(new Request(rewrittenUrl, input), init);
+    }
+    return fetch(rewrittenUrl, init);
+  };
+}
+
+export function createProductionSupabaseServiceClient(
+  env: DatabaseGateEnvironment = process.env as DatabaseGateEnvironment,
+): SupabaseClient {
+  const supabaseServerUrl = getProductionSupabaseServerUrl(env);
+  const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!supabaseServerUrl || !serviceRoleKey) {
+    throw new ProductionDatabaseGateError();
+  }
+  return createClient(supabaseServerUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      fetch: createPostgrestRootFetch(supabaseServerUrl),
+    },
+  });
 }
 
 export function assertProductionDatabaseGate(
@@ -91,19 +176,47 @@ let verifiedDatabaseGate = false;
 export async function assertProductionDatabaseGateReady(
   capability: ProductionDatabaseCapability,
   client?: DatabaseGateRpcClient,
+  env: DatabaseGateEnvironment = process.env as DatabaseGateEnvironment,
 ): Promise<void> {
-  assertProductionDatabaseGate(capability);
+  assertProductionDatabaseGate(capability, env);
   if (verifiedDatabaseGate && !client) return;
-  const rpcClient = client ?? createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!.trim(),
-    process.env.SUPABASE_SERVICE_ROLE_KEY!.trim(),
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  );
+  const rpcClient = client ?? createProductionSupabaseServiceClient();
   const result = await rpcClient.rpc("aistory_database_gate_status");
   if (
     result.error
     || result.data !== PRODUCTION_IDENTITY_DB_GATE_VERSION
   ) {
+    throw new ProductionDatabaseGateError();
+  }
+  const posture = await rpcClient.rpc("aistory_database_security_posture");
+  if (posture.error || posture.data !== true) {
+    throw new ProductionDatabaseGateError();
+  }
+  const adminPosture = await rpcClient.rpc(
+    "aistory_admin_rpc_security_posture",
+  );
+  if (adminPosture.error || adminPosture.data !== true) {
+    throw new ProductionDatabaseGateError();
+  }
+  const phoneAdminPosture = await rpcClient.rpc(
+    "aistory_phone_admin_security_posture",
+  );
+  if (phoneAdminPosture.error || phoneAdminPosture.data !== true) {
+    throw new ProductionDatabaseGateError();
+  }
+  const hostedCredentialPosture = await rpcClient.rpc(
+    "aistory_hosted_byok_security_posture",
+  );
+  if (
+    hostedCredentialPosture.error
+    || hostedCredentialPosture.data !== true
+  ) {
+    throw new ProductionDatabaseGateError();
+  }
+  const videoAssetPosture = await rpcClient.rpc(
+    "aistory_video_asset_security_posture",
+  );
+  if (videoAssetPosture.error || videoAssetPosture.data !== true) {
     throw new ProductionDatabaseGateError();
   }
   if (!client) verifiedDatabaseGate = true;

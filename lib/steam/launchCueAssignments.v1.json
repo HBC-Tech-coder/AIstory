@@ -1,0 +1,340 @@
+{
+  "schema": "aistory-steam-launch-cue-assignments",
+  "schemaVersion": 1,
+  "mode": "human_explicit_review",
+  "reviewPacketFingerprint": "fda3ec7088d07225d6486afa38471f4cc88f79e67d3a1506caac2fb894d1c397",
+  "language": "zh-CN",
+  "shots": [
+    {
+      "nodeId": "vg11_wake_choice",
+      "shotId": "VG11-SHOT-02",
+      "rows": [
+        {
+          "rowIndex": 1,
+          "paragraphId": "P009",
+          "beatId": "vg11_wake_choice_b1",
+          "rowHash": "55428ce6a8dc86d6c164d734c616a67d5246020f614d08bdd2af0e3abb2c95ce",
+          "publicTextHash": "2c740098792ef2be3deab670632458ecfcab0ab9e1f1e682a3c25659e6396421",
+          "speaker": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "audio": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "subtitle": { "kind": "omit", "reasonCode": "non_spoken_public_row" },
+          "timing": { "kind": "none", "reasonCode": "subtitle_omitted" }
+        },
+        {
+          "rowIndex": 2,
+          "paragraphId": "P010",
+          "beatId": "vg11_wake_choice_b2",
+          "rowHash": "45bab0885f8f8d57ce141600dac4e2b013488c440cabddb66492f7f0fc8d495f",
+          "publicTextHash": "72436ee3d4f4460e917b76a2546523e6ff02c40697d5726f09f8982578756d46",
+          "speaker": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "audio": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "subtitle": { "kind": "omit", "reasonCode": "non_spoken_public_row" },
+          "timing": { "kind": "none", "reasonCode": "subtitle_omitted" }
+        }
+      ]
+    },
+    {
+      "nodeId": "vg11_breakfast_choice",
+      "shotId": "VG11-SHOT-04",
+      "rows": [
+        {
+          "rowIndex": 1,
+          "paragraphId": "P023",
+          "beatId": "vg11_breakfast_choice_b1",
+          "rowHash": "c6cb848f6c71887fe1ec9e8e51b5fe17f90abbee0b657c8269110ccda94e397a",
+          "publicTextHash": "f1c7499d1c2ff7978a42f808cf445b31f980d38d576329f1d158735c721b48ab",
+          "speaker": { "kind": "narrator" },
+          "audio": { "kind": "logical_slot", "slotId": "slca1-vg11-breakfast-choice-b1" },
+          "subtitle": {
+            "kind": "include",
+            "cueId": "slcc1-vg11-breakfast-choice-b1",
+            "text": "虚拟女友，早餐已经放在床上：来吃早点",
+            "textHash": "f1c7499d1c2ff7978a42f808cf445b31f980d38d576329f1d158735c721b48ab"
+          },
+          "timing": { "kind": "range", "startMs": 0, "endMs": 3500 }
+        },
+        {
+          "rowIndex": 2,
+          "paragraphId": "P024",
+          "beatId": "vg11_breakfast_choice_b2",
+          "rowHash": "b86f0f727cf56951db01056ba8ecdaba0a3e8263d404a8819291d2e31cfb4c21",
+          "publicTextHash": "4a997ea7271323a514d3b38371eafdb1e5c85b30e8b3dfeac1ff18818e33a4cc",
+          "speaker": { "kind": "narrator" },
+          "audio": { "kind": "logical_slot", "slotId": "slca1-vg11-breakfast-choice-b2" },
+          "subtitle": {
+            "kind": "include",
+            "cueId": "slcc1-vg11-breakfast-choice-b2",
+            "text": "虚拟女友，穿的是男生衬衫，给我喂饭：来，啊，张嘴，",
+            "textHash": "4a997ea7271323a514d3b38371eafdb1e5c85b30e8b3dfeac1ff18818e33a4cc"
+          },
+          "timing": { "kind": "range", "startMs": 3500, "endMs": 7500 }
+        },
+        {
+          "rowIndex": 3,
+          "paragraphId": "P025",
+          "beatId": "vg11_breakfast_choice_b3",
+          "rowHash": "d69483c483c0addfae08dad5a90ec46cb46c427ad8e45e9f69baf6ec8db9ed54",
+          "publicTextHash": "2c2c9a60e41944ab45c6b81428ee5c49425deee7f898ba446cdf7eb12b83de2e",
+          "speaker": { "kind": "narrator" },
+          "audio": { "kind": "logical_slot", "slotId": "slca1-vg11-breakfast-choice-b3" },
+          "subtitle": {
+            "kind": "include",
+            "cueId": "slcc1-vg11-breakfast-choice-b3",
+            "text": "男主，边吃，边说：“你做得？好快”",
+            "textHash": "2c2c9a60e41944ab45c6b81428ee5c49425deee7f898ba446cdf7eb12b83de2e"
+          },
+          "timing": { "kind": "range", "startMs": 7500, "endMs": 10500 }
+        },
+        {
+          "rowIndex": 4,
+          "paragraphId": "P026",
+          "beatId": "vg11_breakfast_choice_b4",
+          "rowHash": "cb0f6dedeab5f263756375507e79b05f118a8686b7d34fc51ef07eb7641209e6",
+          "publicTextHash": "0427e110c656d5b2459c6b191436890e779610a21bce6d49c7aefaed2ce606a4",
+          "speaker": { "kind": "narrator" },
+          "audio": { "kind": "logical_slot", "slotId": "slca1-vg11-breakfast-choice-b4" },
+          "subtitle": {
+            "kind": "include",
+            "cueId": "slcc1-vg11-breakfast-choice-b4",
+            "text": "虚拟女友，假装嫌弃，实则撒娇的说，“订的，我又不是女仆机器人，我是你的女友（以上话，假装说的很重很嫌弃被误解，而后温柔的说），我提前订无人机送餐，给你端过来，让你多睡五分钟。”",
+            "textHash": "0427e110c656d5b2459c6b191436890e779610a21bce6d49c7aefaed2ce606a4"
+          },
+          "timing": { "kind": "range", "startMs": 10500, "endMs": 20500 }
+        },
+        {
+          "rowIndex": 5,
+          "paragraphId": "P027",
+          "beatId": "vg11_breakfast_choice_b5",
+          "rowHash": "12143bfb3f3cee1fa9b22a1d34647e23913cac9c3914c26f321f1acb807ecf71",
+          "publicTextHash": "740dca38154cf0f0a9687068096390766b22c93df3757dc9b8f5628b13e38a6e",
+          "speaker": { "kind": "narrator" },
+          "audio": { "kind": "logical_slot", "slotId": "slca1-vg11-breakfast-choice-b5" },
+          "subtitle": {
+            "kind": "include",
+            "cueId": "slcc1-vg11-breakfast-choice-b5",
+            "text": "男主，“好吃，你这个女友挺好的”",
+            "textHash": "740dca38154cf0f0a9687068096390766b22c93df3757dc9b8f5628b13e38a6e"
+          },
+          "timing": { "kind": "range", "startMs": 20500, "endMs": 23500 }
+        },
+        {
+          "rowIndex": 6,
+          "paragraphId": "P028",
+          "beatId": "vg11_breakfast_choice_b6",
+          "rowHash": "11bf02418bd484cb1221943ab9752b5000e02f383492beb74da2d5691667f6fd",
+          "publicTextHash": "32d867727962dcfe7fc7003c7fbcd970db924756e93b9a04c601d707bf0d2c0c",
+          "speaker": { "kind": "narrator" },
+          "audio": { "kind": "logical_slot", "slotId": "slca1-vg11-breakfast-choice-b6" },
+          "subtitle": {
+            "kind": "include",
+            "cueId": "slcc1-vg11-breakfast-choice-b6",
+            "text": "虚拟女友，故意又生气，“什么这个，那个的，我是你唯一的女友，不愿意我喂吃饿着”",
+            "textHash": "32d867727962dcfe7fc7003c7fbcd970db924756e93b9a04c601d707bf0d2c0c"
+          },
+          "timing": { "kind": "range", "startMs": 23500, "endMs": 30000 }
+        },
+        {
+          "rowIndex": 7,
+          "paragraphId": "P029",
+          "beatId": "vg11_breakfast_choice_b7",
+          "rowHash": "2440c45f7f9dbec2174d8372516d851f301aef666828223a24f6b27ee8535ff8",
+          "publicTextHash": "2c740098792ef2be3deab670632458ecfcab0ab9e1f1e682a3c25659e6396421",
+          "speaker": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "audio": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "subtitle": { "kind": "omit", "reasonCode": "non_spoken_public_row" },
+          "timing": { "kind": "none", "reasonCode": "subtitle_omitted" }
+        },
+        {
+          "rowIndex": 8,
+          "paragraphId": "P030",
+          "beatId": "vg11_breakfast_choice_b8",
+          "rowHash": "89b8461d33170824c5a7d5ee87d184872cf36516c6280c9de768069695dd12a6",
+          "publicTextHash": "83f8c4fc2135bc4264f261326d6cf6ecb8afe8353bfe3051aefb3e0b96bc721b",
+          "speaker": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "audio": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "subtitle": { "kind": "omit", "reasonCode": "non_spoken_public_row" },
+          "timing": { "kind": "none", "reasonCode": "subtitle_omitted" }
+        }
+      ]
+    },
+    {
+      "nodeId": "vg11_wake_pull",
+      "shotId": "VG11-SHOT-05",
+      "rows": [
+        {
+          "rowIndex": 1,
+          "paragraphId": "P031",
+          "beatId": "vg11_wake_pull_b1",
+          "rowHash": "79c70da6bff4f4a42748b4bea72de6045f9afef1863dc401a9b5d85149e58536",
+          "publicTextHash": "02bc4404fc1c5af5d0020f4f8fbae8c565a7aac4e54121f4dd6058d89208be80",
+          "speaker": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "audio": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "subtitle": { "kind": "omit", "reasonCode": "non_spoken_public_row" },
+          "timing": { "kind": "none", "reasonCode": "subtitle_omitted" }
+        },
+        {
+          "rowIndex": 2,
+          "paragraphId": "P032",
+          "beatId": "vg11_wake_pull_b2",
+          "rowHash": "4c63e3e0c7658bcf6e4c06e170cc1ec5678b259c5e74c3bd45917eac96034193",
+          "publicTextHash": "3ced2022060997ade5778732b42214df1634b544a76d0f218bff1b8a2fee2b9c",
+          "speaker": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "audio": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "subtitle": { "kind": "omit", "reasonCode": "non_spoken_public_row" },
+          "timing": { "kind": "none", "reasonCode": "subtitle_omitted" }
+        },
+        {
+          "rowIndex": 3,
+          "paragraphId": "P033",
+          "beatId": "vg11_wake_pull_b3",
+          "rowHash": "e8c2717fc7be98532fd03d3fb5137b22fc0c3a21d8f1375b63f34cb31ffb4732",
+          "publicTextHash": "1e12e847afe5e831ec2432fd07d396644229644b68ed444110926e2ecae4cc72",
+          "speaker": { "kind": "narrator" },
+          "audio": { "kind": "logical_slot", "slotId": "slca1-vg11-wake-pull-b3" },
+          "subtitle": {
+            "kind": "include",
+            "cueId": "slcc1-vg11-wake-pull-b3",
+            "text": "男主说：“拉我起床”，同时伸手",
+            "textHash": "1e12e847afe5e831ec2432fd07d396644229644b68ed444110926e2ecae4cc72"
+          },
+          "timing": { "kind": "range", "startMs": 0, "endMs": 3500 }
+        },
+        {
+          "rowIndex": 4,
+          "paragraphId": "P034",
+          "beatId": "vg11_wake_pull_b4",
+          "rowHash": "20f406c3929945bafa35ee80d630defec08fb54be61c99d98314fc5b9291de85",
+          "publicTextHash": "04fae9d74cc4a1fed30834365f9adf4983e5614f3ba6a8a14bd7c21963521639",
+          "speaker": { "kind": "narrator" },
+          "audio": { "kind": "logical_slot", "slotId": "slca1-vg11-wake-pull-b4" },
+          "subtitle": {
+            "kind": "include",
+            "cueId": "slcc1-vg11-wake-pull-b4",
+            "text": "虚拟女友拉住男主的手，“起来吧”（【彩蛋点】）",
+            "textHash": "04fae9d74cc4a1fed30834365f9adf4983e5614f3ba6a8a14bd7c21963521639"
+          },
+          "timing": { "kind": "range", "startMs": 3500, "endMs": 7500 }
+        },
+        {
+          "rowIndex": 5,
+          "paragraphId": "P035",
+          "beatId": "vg11_wake_pull_b5",
+          "rowHash": "cc2b328289422f8e32490aa853dcb12217f4c86490868ca2e5da5535914349a6",
+          "publicTextHash": "852c3632dfa0ae713d35d42f8a4c5708a211509e2324ba6dde597984492b322e",
+          "speaker": { "kind": "narrator" },
+          "audio": { "kind": "logical_slot", "slotId": "slca1-vg11-wake-pull-b5" },
+          "subtitle": {
+            "kind": "include",
+            "cueId": "slcc1-vg11-wake-pull-b5",
+            "text": "虚拟女友把男主拉的坐起来，随手扔一个衣服过来，“自己穿，我给你拿早饭”",
+            "textHash": "852c3632dfa0ae713d35d42f8a4c5708a211509e2324ba6dde597984492b322e"
+          },
+          "timing": { "kind": "range", "startMs": 7500, "endMs": 13000 }
+        },
+        {
+          "rowIndex": 6,
+          "paragraphId": "P036",
+          "beatId": "vg11_wake_pull_b6",
+          "rowHash": "1686d89829351006c13ce1bdca9ca6478f0a8a0f4184a7e899c0b7825a7ff90f",
+          "publicTextHash": "460940a62602e9374764eef75e64daafe4fad68f0847b5aaf80147e068381378",
+          "speaker": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "audio": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "subtitle": { "kind": "omit", "reasonCode": "non_spoken_public_row" },
+          "timing": { "kind": "none", "reasonCode": "subtitle_omitted" }
+        },
+        {
+          "rowIndex": 7,
+          "paragraphId": "P037",
+          "beatId": "vg11_wake_pull_b7",
+          "rowHash": "368011cb2e5d14323dcee1998ba43e02a9b1f7de333bbbbaecb1ad52b81f49e7",
+          "publicTextHash": "00154df552247b01e0c4a7f657dc18678dcf230904b7357ef615f8869934a39c",
+          "speaker": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "audio": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "subtitle": { "kind": "omit", "reasonCode": "non_spoken_public_row" },
+          "timing": { "kind": "none", "reasonCode": "subtitle_omitted" }
+        },
+        {
+          "rowIndex": 8,
+          "paragraphId": "P038",
+          "beatId": "vg11_wake_pull_b8",
+          "rowHash": "6f60adbfd5a719ae13448e4fa1f3ae52bb1b4c9cb9d6977f2672b0c957c4b775",
+          "publicTextHash": "286fac7809f79b601f9c71ec6be3170c4642faf019365c4fac26ad6a479ad816",
+          "speaker": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "audio": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "subtitle": { "kind": "omit", "reasonCode": "non_spoken_public_row" },
+          "timing": { "kind": "none", "reasonCode": "subtitle_omitted" }
+        },
+        {
+          "rowIndex": 9,
+          "paragraphId": "P039",
+          "beatId": "vg11_wake_pull_b9",
+          "rowHash": "9aabadd079ae4cbd1a4738e43bf4c42788ca12c155f172c16ad415fb474d2bca",
+          "publicTextHash": "d807fed927412748798d9de410949cf753655c7862db798546e2f1c74eb68af9",
+          "speaker": { "kind": "narrator" },
+          "audio": { "kind": "logical_slot", "slotId": "slca1-vg11-wake-pull-b9" },
+          "subtitle": {
+            "kind": "include",
+            "cueId": "slcc1-vg11-wake-pull-b9",
+            "text": "男主，用来把虚拟女友拽到床上，拽到怀里，",
+            "textHash": "d807fed927412748798d9de410949cf753655c7862db798546e2f1c74eb68af9"
+          },
+          "timing": { "kind": "range", "startMs": 13000, "endMs": 17500 }
+        },
+        {
+          "rowIndex": 10,
+          "paragraphId": "P040",
+          "beatId": "vg11_wake_pull_b10",
+          "rowHash": "f5e52f43f99962896882fa5027bb39982218b69f286ad8043a4d16e09e1db6fb",
+          "publicTextHash": "52575e38fff21084d0fae8f976120590bf00192f4ade74bdb1457df49a33439a",
+          "speaker": { "kind": "narrator" },
+          "audio": { "kind": "logical_slot", "slotId": "slca1-vg11-wake-pull-b10" },
+          "subtitle": {
+            "kind": "include",
+            "cueId": "slcc1-vg11-wake-pull-b10",
+            "text": "虚拟女友，小声叹了一下气，主动吻了男主",
+            "textHash": "52575e38fff21084d0fae8f976120590bf00192f4ade74bdb1457df49a33439a"
+          },
+          "timing": { "kind": "range", "startMs": 17500, "endMs": 22000 }
+        },
+        {
+          "rowIndex": 11,
+          "paragraphId": "P041",
+          "beatId": "vg11_wake_pull_b11",
+          "rowHash": "08841421d641253a422081d2d6d1e80c89e9af93266d4b04e426d26fd8aa21e2",
+          "publicTextHash": "87f3355be165b3b94051a928c02ef3deeb727948c0232b8c0b4409f1db9cb67c",
+          "speaker": { "kind": "narrator" },
+          "audio": { "kind": "logical_slot", "slotId": "slca1-vg11-wake-pull-b11" },
+          "subtitle": {
+            "kind": "include",
+            "cueId": "slcc1-vg11-wake-pull-b11",
+            "text": "之后虚拟女友假装生气的，“我不拉你起床了，你睡吧”落荒而逃。",
+            "textHash": "87f3355be165b3b94051a928c02ef3deeb727948c0232b8c0b4409f1db9cb67c"
+          },
+          "timing": { "kind": "range", "startMs": 22000, "endMs": 30000 }
+        },
+        {
+          "rowIndex": 12,
+          "paragraphId": "P042",
+          "beatId": "vg11_wake_pull_b12",
+          "rowHash": "37f6268ca282680548fa9d740f3a477952966bbe9c9f387cbbbffbb391c75703",
+          "publicTextHash": "16cca60927fbb52a88490e6944e89d630853224f911e53cfcb187d5d50d17e9e",
+          "speaker": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "audio": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "subtitle": { "kind": "omit", "reasonCode": "non_spoken_public_row" },
+          "timing": { "kind": "none", "reasonCode": "subtitle_omitted" }
+        },
+        {
+          "rowIndex": 13,
+          "paragraphId": "P043",
+          "beatId": "vg11_wake_pull_b13",
+          "rowHash": "c6b8c7f64ec86b6b1c1d1616c9d7eb3b3400cae64ae9506bcc31cc13b553325b",
+          "publicTextHash": "f06f0b392dabc7b659b57bb67795f5f30a63a7e0daf5f641d27c1e1d4f072255",
+          "speaker": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "audio": { "kind": "none", "reasonCode": "non_spoken_public_row" },
+          "subtitle": { "kind": "omit", "reasonCode": "non_spoken_public_row" },
+          "timing": { "kind": "none", "reasonCode": "subtitle_omitted" }
+        }
+      ]
+    }
+  ]
+}

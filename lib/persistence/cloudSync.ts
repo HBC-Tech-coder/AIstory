@@ -26,6 +26,7 @@ import {
   markRecordSynced,
 } from "./localStore";
 import { idbGet, STORIES_STORE } from "./idb";
+import { activeStoryNamespace, storyStorageKey } from "./storyNamespace";
 import { coerceEpoch, type StoryRecord, type StorySyncMeta, type StorySyncEnvelope } from "./types";
 
 // Keep in lockstep with the pull route's MAX_PULL_IDS.
@@ -237,7 +238,10 @@ export async function pushDeletion(id: string): Promise<void> {
   if (!AUTH_ENABLED || !id) return;
   try {
     if (!(await isAuthed())) return;
-    const rec = await idbGet<StoryRecord>(STORIES_STORE, id);
+    const rec = await idbGet<StoryRecord>(
+      STORIES_STORE,
+      storyStorageKey(activeStoryNamespace(), id),
+    );
     if (!rec || !rec.deletedAt) return; // not a tombstone / already gone
     const ok = await pushDelete(id, rec.rev ?? 1, coerceEpoch(rec.deletedAt, Date.now()));
     if (ok) await markRecordSynced(id, rec.rev ?? 1, coerceEpoch(rec.updatedAt, 0));

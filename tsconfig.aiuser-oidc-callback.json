@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "incremental": false, "noEmit": true },
+  "include": [
+    "next-env.d.ts", "lib/auth/aiUserOidcCallback.ts", "lib/auth/aiUserOidcCallbackServer.ts",
+    "app/api/auth/aiuser/start/route.ts", "app/api/auth/aiuser/callback/route.ts",
+    "scripts/test-aiuser-oidc-callback.ts", "middleware.ts"
+  ],
+  "exclude": ["node_modules", "dist", ".next", ".tmp", "app/app", "components/components", "lib/lib"]
+}

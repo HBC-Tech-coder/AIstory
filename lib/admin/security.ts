@@ -9,6 +9,17 @@ import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_ENABLED } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
+import { ProductionDatabaseGateError } from "@/lib/production/databaseGate";
+import { isLoopbackHost } from "@/lib/security/host";
+import { LINGHAO_PASSPORT_V4_PRODUCT_SESSION_COOKIE } from "@/lib/auth/linghaoPassportV4ProductionCookies";
+import { resolveProductionAdminRoles } from "./productionIdentity";
+import {
+  hasIndependentAdminPrincipalModeValue,
+  INDEPENDENT_ADMIN_PRINCIPAL_PRODUCTION_COOKIE,
+  IndependentAdminPrincipalServerError,
+  isIndependentAdminPrincipalProductionModeSelected,
+  resolveIndependentAdminPrincipalAuthorizedContext,
+} from "./independentPrincipalServer";
 import { ADMIN_ROLES, type AdminActor, type AdminRole } from "./types";
 
 export const LOCAL_ADMIN_COOKIE = "aistory_local_admin";
@@ -19,18 +30,7 @@ function localAdminSecret(): string | undefined {
   return secret && secret.length >= 24 ? secret : undefined;
 }
 
-export function isLoopbackHost(hostHeader: string | null): boolean {
-  if (!hostHeader) return false;
-  const hostname = hostHeader
-    .trim()
-    .replace(/^\[/, "")
-    .replace(/\](?::\d+)?$/, "")
-    .replace(/:\d+$/, "")
-    .toLowerCase();
-  return hostname === "localhost"
-    || hostname === "127.0.0.1"
-    || hostname === "::1";
-}
+export { isLoopbackHost } from "@/lib/security/host";
 
 export function isLocalAdminEnabled(): boolean {
   return process.env.AISTORY_LOCAL_ADMIN_ENABLED === "true"
@@ -98,23 +98,32 @@ export function localSecretMatches(candidate: string): boolean {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-function normalizeRoles(value: unknown): AdminRole[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(
-    (role): role is AdminRole =>
-      typeof role === "string"
-      && (ADMIN_ROLES as readonly string[]).includes(role),
-  );
-}
-
 export async function resolveAdminActor(): Promise<AdminActor | undefined> {
   const headerStore = await headers();
   const cookieStore = await cookies();
+  if (isIndependentAdminPrincipalProductionModeSelected()) {
+    const independentToken = cookieStore.get(
+      INDEPENDENT_ADMIN_PRINCIPAL_PRODUCTION_COOKIE,
+    )?.value;
+    if (!independentToken) return undefined;
+    return (
+      await resolveIndependentAdminPrincipalAuthorizedContext(independentToken)
+    )?.actor;
+  }
+  // Any non-empty unknown/local-fake principal mode blocks legacy fallback.
+  // P0.4 local_fake_only is evidence, not a production authentication mode.
+  if (hasIndependentAdminPrincipalModeValue()) return undefined;
+
   const local = verifyLocalAdminToken(
     cookieStore.get(LOCAL_ADMIN_COOKIE)?.value,
     headerStore.get("host"),
   );
   if (local) return local;
+
+  // A Passport product cookie, including a stale or malformed one, owns the
+  // browser identity boundary. It can never fall through to legacy Supabase
+  // administrator identity; explicit Passport logout restores rollback.
+  if (cookieStore.get(LINGHAO_PASSPORT_V4_PRODUCT_SESSION_COOKIE)) return undefined;
 
   // AUTH_ENABLED=false must never imply administrator access.
   if (!AUTH_ENABLED) return undefined;
@@ -122,21 +131,45 @@ export async function resolveAdminActor(): Promise<AdminActor | undefined> {
   const claims = await supabase.auth.getClaims();
   const userId = claims.data?.claims?.sub;
   if (claims.error || typeof userId !== "string") return undefined;
-  const result = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
-  if (result.error) return undefined;
-  const roles = normalizeRoles(result.data?.map((row) => row.role));
-  if (!roles.length) return undefined;
+  const roles = await resolveProductionAdminRoles(userId);
+  if (!roles?.length) return undefined;
   return { userId, roles, mode: "production" };
 }
 
+export function requireAdmin(
+  allowedRoles?: AdminRole[],
+  options?: Readonly<{ allowIndependent?: false | undefined }>,
+): Promise<(
+  AdminActor & { mode: "local" | "production" }
+) | NextResponse>;
+export function requireAdmin(
+  allowedRoles: AdminRole[] | undefined,
+  options: Readonly<{ allowIndependent: true }>,
+): Promise<AdminActor | NextResponse>;
 export async function requireAdmin(
   allowedRoles: AdminRole[] = [...ADMIN_ROLES],
+  options?: Readonly<{ allowIndependent?: boolean }>,
 ): Promise<AdminActor | NextResponse> {
-  const actor = await resolveAdminActor();
-  if (!actor || !actor.roles.some((role) => allowedRoles.includes(role))) {
+  let actor: AdminActor | undefined;
+  try {
+    actor = await resolveAdminActor();
+  } catch (error) {
+    if (
+      error instanceof ProductionDatabaseGateError
+      || error instanceof IndependentAdminPrincipalServerError
+    ) {
+      return NextResponse.json(
+        { error: "Administrator repository is unavailable." },
+        { status: 503 },
+      );
+    }
+    throw error;
+  }
+  if (
+    !actor
+    || (actor.mode === "independent" && !options?.allowIndependent)
+    || !actor.roles.some((role) => allowedRoles.includes(role))
+  ) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   return actor;

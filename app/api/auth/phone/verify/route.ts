@@ -1,36 +1,64 @@
 import { NextResponse } from "next/server";
 
 import {
-  PhoneAuthError,
-  resolveSmsProvider,
+  normalizePhone,
   verifyPhoneOtp,
 } from "@/lib/auth/phoneAuthService";
 import {
-  createUserSessionToken,
+  authorizePhoneOtpAdmission,
+  PHONE_REGISTRATION_POLICY_VALUES,
+  phoneOtpAdmissionIsCurrent,
+} from "@/lib/auth/phoneInviteBetaGate";
+import {
+  prepareUserSessionTokenIssuer,
   USER_SESSION_COOKIE,
   userSessionCookieOptions,
 } from "@/lib/auth/userSession";
 import { getAdminRepository } from "@/lib/admin/service";
-import { ProductionDatabaseGateError } from "@/lib/production/databaseGate";
 import { isTrustedLoopbackMutationRequest } from "@/lib/security/localMutation";
+import {
+  emptyAnonymousClaimResult,
+  type AnonymousClaimResult,
+} from "@/lib/auth/anonymousClaim";
+import { prepareServerAnonymousClaim } from "@/lib/auth/anonymousClaimServer";
 
 export const runtime = "nodejs";
+const MAX_VERIFY_BODY_BYTES = 160 * 1024;
+
+function localMockSmsEnabled(): boolean {
+  return process.env.AISTORY_SMS_PROVIDER === "local_mock"
+    && process.env.AISTORY_LOCAL_SMS_ENABLED === "true";
+}
+
+function rejectedOtpResponse(): Response {
+  return NextResponse.json(
+    {
+      error: "验证码无效或已过期。",
+      code: "OTP_INVALID_OR_EXPIRED",
+    },
+    { status: 400 },
+  );
+}
 
 export async function POST(request: Request): Promise<Response> {
-  const provider = resolveSmsProvider();
-  if (
-    provider.id === "local_mock"
-    && !isTrustedLoopbackMutationRequest(request)
-  ) {
+  if (localMockSmsEnabled() && !isTrustedLoopbackMutationRequest(request)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   let body: {
     phone?: unknown;
     challengeId?: unknown;
     code?: unknown;
+    anonymousClaim?: unknown;
   };
   try {
-    body = await request.json() as typeof body;
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).byteLength > MAX_VERIFY_BODY_BYTES) {
+      return NextResponse.json(
+        { error: "本机进度清单过大，未执行登录。" },
+        { status: 413 },
+      );
+    }
+    body = JSON.parse(raw) as typeof body;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -44,12 +72,46 @@ export async function POST(request: Request): Promise<Response> {
       { status: 400 },
     );
   }
+  let normalizedPhone: string;
+  try {
+    normalizedPhone = normalizePhone(body.phone);
+  } catch {
+    return rejectedOtpResponse();
+  }
+  const admission = await authorizePhoneOtpAdmission(normalizedPhone);
+  if (!admission.allowed) return rejectedOtpResponse();
+  let issueUserSessionToken: ReturnType<
+    typeof prepareUserSessionTokenIssuer
+  >;
+  try {
+    issueUserSessionToken = prepareUserSessionTokenIssuer();
+  } catch {
+    return rejectedOtpResponse();
+  }
+  let anonymousClaim;
+  try {
+    anonymousClaim = await prepareServerAnonymousClaim(
+      request,
+      body.anonymousClaim,
+    );
+  } catch {
+    return rejectedOtpResponse();
+  }
+  if (!await phoneOtpAdmissionIsCurrent(
+    normalizedPhone,
+    admission,
+  )) return rejectedOtpResponse();
   try {
     const account = await verifyPhoneOtp(getAdminRepository(), {
-      phone: body.phone,
+      phone: normalizedPhone,
       challengeId: body.challengeId,
       code: body.code,
+      ...(anonymousClaim ? { anonymousClaim } : {}),
     });
+    const claim: AnonymousClaimResult | undefined = account.claim ??
+      (body.anonymousClaim
+        ? emptyAnonymousClaimResult("not_found")
+        : undefined);
     const response = NextResponse.json({
       ok: true,
       account: {
@@ -58,29 +120,26 @@ export async function POST(request: Request): Promise<Response> {
         balance: account.balance,
         initialGrantApplied: account.initialGrantApplied,
       },
+      ...(claim ? { claim } : {}),
     });
     response.cookies.set(
       USER_SESSION_COOKIE,
-      createUserSessionToken(account.userId),
+      issueUserSessionToken(
+        account.userId,
+        admission.mode === "invite_only"
+          ? {
+              inviteBetaPolicyFingerprint:
+                admission.membershipPolicyFingerprint,
+            }
+          : {
+              phoneRegistrationPolicy:
+                PHONE_REGISTRATION_POLICY_VALUES.publicBeta,
+            },
+      ),
       userSessionCookieOptions(),
     );
     return response;
-  } catch (error) {
-    if (error instanceof ProductionDatabaseGateError) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.status },
-      );
-    }
-    if (error instanceof PhoneAuthError) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.status },
-      );
-    }
-    return NextResponse.json(
-      { error: "手机号登录暂时不可用。" },
-      { status: 503 },
-    );
+  } catch {
+    return rejectedOtpResponse();
   }
 }

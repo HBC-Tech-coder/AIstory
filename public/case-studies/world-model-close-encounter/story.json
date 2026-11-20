@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 1,
+  "kind": "aistory-authored-case",
+  "card": {
+    "id": "world-model-close-encounter",
+    "gender": "男性向",
+    "index": 0,
+    "title": "她记得你的触碰",
+    "outline": "真人近距离第一视角互动，一个动作让轻松的玩笑变成认真提问。",
+    "style": "世界模型生成 · 第一视角互动演示",
+    "tags": [
+      "世界模型生成",
+      "第一视角演示",
+      "作者锁定"
+    ],
+    "coverPath": "/case-studies/world-model-close-encounter/assets/poster.jpg",
+    "playPath": "/play?case=world-model-close-encounter",
+    "assetStatus": "ready",
+    "active": true
+  },
+  "session": {
+    "id": "case:world-model-close-encounter",
+    "createdAt": 1786320000000,
+    "worldSetting": "真人近距离第一视角互动，一个动作让轻松的玩笑变成认真提问。",
+    "styleGuide": "世界模型生成的第一视角视频，保持原片画面与声音。",
+    "history": [
+      {
+        "scene": {
+          "id": "world-model-close-encounter:video",
+          "scenePrompt": "世界模型第一视角互动演示：她记得你的触碰",
+          "entryBeatId": "world-model-close-encounter:after-video",
+          "sceneKey": "world-model-close-encounter",
+          "imageUrl": "/case-studies/world-model-close-encounter/assets/poster.jpg",
+          "orientation": "landscape",
+          "media": {
+            "kind": "video",
+            "url": "/api/video-assets/world-model-demos/world-model-close-encounter/content",
+            "posterUrl": "/case-studies/world-model-close-encounter/assets/poster.jpg",
+            "durationMs": 129780,
+            "hasAudio": true,
+            "endBehavior": "unlock-interaction",
+            "allowSkip": true,
+            "hotspotsEnabled": false
+          },
+          "beats": [
+            {
+              "id": "world-model-close-encounter:after-video",
+              "narration": "她忽然收住笑意，认真看着你：“刚才那个动作，你是只对我这样，还是对所有人都这样？”",
+              "next": {
+                "type": "choice",
+                "choices": [
+                  {
+                    "id": "world-model-close-encounter:only-you:choice",
+                    "label": "【选项】坦白只有她例外",
+                    "effect": {
+                      "kind": "change-scene",
+                      "nextSceneSeed": "author-locked:world-model-close-encounter:only-you",
+                      "authoredTargetNodeId": "world-model-close-encounter:only-you"
+                    }
+                  },
+                  {
+                    "id": "world-model-close-encounter:shared-secret:choice",
+                    "label": "【选项】用一个共同秘密回答",
+                    "effect": {
+                      "kind": "change-scene",
+                      "nextSceneSeed": "author-locked:world-model-close-encounter:shared-secret",
+                      "authoredTargetNodeId": "world-model-close-encounter:shared-secret"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "visitedBeatIds": [
+          "world-model-close-encounter:after-video"
+        ],
+        "storyStateAfter": {
+          "logline": "她忽然收住笑意，认真看着你：“刚才那个动作，你是只对我这样，还是对所有人都这样？”",
+          "genreTags": "世界模型 / 第一视角 / 互动视频 / 作者锁定",
+          "protagonist": "你以第一人称进入一段世界模型生成的影像，并在结尾决定故事下一步。",
+          "castNotes": "演示角色与动物仅用于本地作者锁定互动，不触发模型续写。",
+          "synopsis": "真人近距离第一视角互动，一个动作让轻松的玩笑变成认真提问。",
+          "openThreads": [
+            "她忽然收住笑意，认真看着你：“刚才那个动作，你是只对我这样，还是对所有人都这样？”"
+          ],
+          "relationships": [],
+          "nextHook": "视频结束后，由玩家选择下一步。"
+        }
+      }
+    ],
+    "characters": [],
+    "storyState": {
+      "logline": "她忽然收住笑意，认真看着你：“刚才那个动作，你是只对我这样，还是对所有人都这样？”",
+      "genreTags": "世界模型 / 第一视角 / 互动视频 / 作者锁定",
+      "protagonist": "你以第一人称进入一段世界模型生成的影像，并在结尾决定故事下一步。",
+      "castNotes": "演示角色与动物仅用于本地作者锁定互动，不触发模型续写。",
+      "synopsis": "真人近距离第一视角互动，一个动作让轻松的玩笑变成认真提问。",
+      "openThreads": [
+        "她忽然收住笑意，认真看着你：“刚才那个动作，你是只对我这样，还是对所有人都这样？”"
+      ],
+      "relationships": [],
+      "nextHook": "视频结束后，由玩家选择下一步。"
+    },
+    "orientation": "landscape",
+    "language": "zh-CN",
+    "cacheIdentity": {
+      "visibility": "public",
+      "storyId": "case:world-model-close-encounter",
+      "templateId": "world-model-close-encounter",
+      "version": "world-model-demo-v1"
+    },
+    "authoredStory": {
+      "caseStudyId": "world-model-close-encounter",
+      "version": "author-locked-world-model-demo-v1",
+      "authorLocked": true,
+      "releasePolicy": {
+        "defaultAccess": "public",
+        "restrictedNodeIds": []
+      },
+      "currentNodeId": "world-model-close-encounter:start",
+      "currentBeatId": "world-model-close-encounter:after-video",
+      "visitedNodeIds": [
+        "world-model-close-encounter:start"
+      ],
+      "variables": {},
+      "variableDefinitions": [],
+      "nodes": [
+        {
+          "nodeId": "world-model-close-encounter:start",
+          "sourceSceneId": "world-model-close-encounter-video",
+          "title": "她记得你的触碰",
+          "kind": "video",
+          "episodeId": "world-model-demo",
+          "sourceParagraphIds": [
+            "world-model-close-encounter:video"
+          ],
+          "releasePolicy": "public",
+          "scene": {
+            "id": "world-model-close-encounter:video",
+            "scenePrompt": "世界模型第一视角互动演示：她记得你的触碰",
+            "entryBeatId": "world-model-close-encounter:after-video",
+            "sceneKey": "world-model-close-encounter",
+            "imageUrl": "/case-studies/world-model-close-encounter/assets/poster.jpg",
+            "orientation": "landscape",
+            "media": {
+              "kind": "video",
+              "url": "/api/video-assets/world-model-demos/world-model-close-encounter/content",
+              "posterUrl": "/case-studies/world-model-close-encounter/assets/poster.jpg",
+              "durationMs": 129780,
+              "hasAudio": true,
+              "endBehavior": "unlock-interaction",
+              "allowSkip": true,
+              "hotspotsEnabled": false
+            },
+            "beats": [
+              {
+                "id": "world-model-close-encounter:after-video",
+                "narration": "她忽然收住笑意，认真看着你：“刚才那个动作，你是只对我这样，还是对所有人都这样？”",
+                "next": {
+                  "type": "choice",
+                  "choices": [
+                    {
+                      "id": "world-model-close-encounter:only-you:choice",
+                      "label": "【选项】坦白只有她例外",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "author-locked:world-model-close-encounter:only-you",
+                        "authoredTargetNodeId": "world-model-close-encounter:only-you"
+                      }
+                    },
+                    {
+                      "id": "world-model-close-encounter:shared-secret:choice",
+                      "label": "【选项】用一个共同秘密回答",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "author-locked:world-model-close-encounter:shared-secret",
+                        "authoredTargetNodeId": "world-model-close-encounter:shared-secret"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "nodeId": "world-model-close-encounter:only-you",
+          "sourceSceneId": "only-you-ending",
+          "title": "坦白只有她例外",
+          "kind": "ending",
+          "episodeId": "world-model-demo",
+          "sourceParagraphIds": [
+            "world-model-close-encounter:only-you"
+          ],
+          "releasePolicy": "public",
+          "scene": {
+            "id": "world-model-close-encounter:only-you:scene",
+            "scenePrompt": "世界模型互动演示结尾：坦白只有她例外",
+            "entryBeatId": "world-model-close-encounter:only-you:beat",
+            "sceneKey": "world-model-close-encounter-ending",
+            "imageUrl": "/case-studies/world-model-close-encounter/assets/poster.jpg",
+            "orientation": "landscape",
+            "media": {
+              "kind": "image",
+              "url": "/case-studies/world-model-close-encounter/assets/poster.jpg"
+            },
+            "beats": [
+              {
+                "id": "world-model-close-encounter:only-you:beat",
+                "narration": "你没有绕开她的目光。短暂的安静之后，她重新笑起来，却比刚才更慢、更认真。",
+                "next": {
+                  "type": "choice",
+                  "choices": []
+                }
+              }
+            ]
+          }
+        },
+        {
+          "nodeId": "world-model-close-encounter:shared-secret",
+          "sourceSceneId": "shared-secret-ending",
+          "title": "用一个共同秘密回答",
+          "kind": "ending",
+          "episodeId": "world-model-demo",
+          "sourceParagraphIds": [
+            "world-model-close-encounter:shared-secret"
+          ],
+          "releasePolicy": "public",
+          "scene": {
+            "id": "world-model-close-encounter:shared-secret:scene",
+            "scenePrompt": "世界模型互动演示结尾：用一个共同秘密回答",
+            "entryBeatId": "world-model-close-encounter:shared-secret:beat",
+            "sceneKey": "world-model-close-encounter-ending",
+            "imageUrl": "/case-studies/world-model-close-encounter/assets/poster.jpg",
+            "orientation": "landscape",
+            "media": {
+              "kind": "image",
+              "url": "/case-studies/world-model-close-encounter/assets/poster.jpg"
+            },
+            "beats": [
+              {
+                "id": "world-model-close-encounter:shared-secret:beat",
+                "narration": "你提起那个只有你们知道的秘密。她听完轻轻点头：“好，这次算你回答了。”",
+                "next": {
+                  "type": "choice",
+                  "choices": []
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "assetSummary": {
+    "generated": 2,
+    "pending": 0,
+    "failed": 0
+  }
+}

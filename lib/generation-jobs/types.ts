@@ -2,6 +2,7 @@ import type { ComfyUIModality } from "@/lib/providers/comfyui/types";
 
 export type GenerationJobProvider =
   | "comfyui"
+  | "gpu-connector-lan"
   | "localminidrama"
   | "volcengine-agent-plan";
 export type GenerationJobStatus =
@@ -37,6 +38,7 @@ export type GenerationJob = {
   errorCode?: string;
   errorMessage?: string;
   notes?: Array<"cancel_requested_but_completed" | "artifact_unavailable">;
+  releaseClassification?: "non_publishable";
   artifact?: GenerationArtifact;
   provenance: {
     purpose: "foreground";
@@ -85,13 +87,53 @@ export type LocalMiniDramaImageJobInput = {
   idempotencyKey: string;
 };
 
+export type LanGpuVideoGenerateJobInput = {
+  taskType: "generate";
+  workflowId: string;
+  workflowSha256: string;
+  prompt: string;
+  negativePrompt?: string;
+  seed: number;
+  width: number;
+  height: number;
+  frames: number;
+  fps: number;
+  projectId?: number;
+  idempotencyKey: string;
+};
+
+export type LanGpuVideoUpscaleJobInput = {
+  taskType: "upscale";
+  workflowId: string;
+  workflowSha256: string;
+  sourceJobId: string;
+  width: number;
+  height: number;
+  frames: number;
+  fps: number;
+  preserveAudio: true;
+  projectId?: number;
+  idempotencyKey: string;
+};
+
+export type LanGpuVideoJobInput =
+  | LanGpuVideoGenerateJobInput
+  | LanGpuVideoUpscaleJobInput;
+
 export type StoredGenerationJob =
   | (GenerationJob & {
       provider: "comfyui";
       input: ComfyUIGenerationJobInput;
+      /** Server-only immutable registry selection captured before enqueue. */
+      workflowFingerprint?: string;
     })
   | (GenerationJob & {
       provider: "localminidrama";
       modality: "image";
       input: LocalMiniDramaImageJobInput;
+    })
+  | (GenerationJob & {
+      provider: "gpu-connector-lan";
+      modality: "video";
+      input: LanGpuVideoJobInput;
     });

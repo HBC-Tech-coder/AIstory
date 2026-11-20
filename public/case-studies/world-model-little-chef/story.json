@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 1,
+  "kind": "aistory-authored-case",
+  "card": {
+    "id": "world-model-little-chef",
+    "gender": "男性向",
+    "index": 0,
+    "title": "今天由小厨师掌勺",
+    "outline": "萌宠厨房第一视角互动，喂食之后，小厨师又提出了新的菜单。",
+    "style": "世界模型生成 · 第一视角互动演示",
+    "tags": [
+      "世界模型生成",
+      "第一视角演示",
+      "作者锁定"
+    ],
+    "coverPath": "/case-studies/world-model-little-chef/assets/poster.jpg",
+    "playPath": "/play?case=world-model-little-chef",
+    "assetStatus": "ready",
+    "active": true
+  },
+  "session": {
+    "id": "case:world-model-little-chef",
+    "createdAt": 1786320000000,
+    "worldSetting": "萌宠厨房第一视角互动，喂食之后，小厨师又提出了新的菜单。",
+    "styleGuide": "世界模型生成的第一视角视频，保持原片画面与声音。",
+    "history": [
+      {
+        "scene": {
+          "id": "world-model-little-chef:video",
+          "scenePrompt": "世界模型第一视角互动演示：今天由小厨师掌勺",
+          "entryBeatId": "world-model-little-chef:after-video",
+          "sceneKey": "world-model-little-chef",
+          "imageUrl": "/case-studies/world-model-little-chef/assets/poster.jpg",
+          "orientation": "landscape",
+          "media": {
+            "kind": "video",
+            "url": "/api/video-assets/world-model-demos/world-model-little-chef/content",
+            "posterUrl": "/case-studies/world-model-little-chef/assets/poster.jpg",
+            "durationMs": 54010,
+            "hasAudio": true,
+            "endBehavior": "unlock-interaction",
+            "allowSkip": true,
+            "hotspotsEnabled": false
+          },
+          "beats": [
+            {
+              "id": "world-model-little-chef:after-video",
+              "narration": "小厨师把空碗推回你面前，又用爪子指了指冰箱——看来下一道菜该由你决定。",
+              "next": {
+                "type": "choice",
+                "choices": [
+                  {
+                    "id": "world-model-little-chef:apple-dessert:choice",
+                    "label": "【选项】做一份苹果点心",
+                    "effect": {
+                      "kind": "change-scene",
+                      "nextSceneSeed": "author-locked:world-model-little-chef:apple-dessert",
+                      "authoredTargetNodeId": "world-model-little-chef:apple-dessert"
+                    }
+                  },
+                  {
+                    "id": "world-model-little-chef:buy-ingredients:choice",
+                    "label": "【选项】带它去采购食材",
+                    "effect": {
+                      "kind": "change-scene",
+                      "nextSceneSeed": "author-locked:world-model-little-chef:buy-ingredients",
+                      "authoredTargetNodeId": "world-model-little-chef:buy-ingredients"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "visitedBeatIds": [
+          "world-model-little-chef:after-video"
+        ],
+        "storyStateAfter": {
+          "logline": "小厨师把空碗推回你面前，又用爪子指了指冰箱——看来下一道菜该由你决定。",
+          "genreTags": "世界模型 / 第一视角 / 互动视频 / 作者锁定",
+          "protagonist": "你以第一人称进入一段世界模型生成的影像，并在结尾决定故事下一步。",
+          "castNotes": "演示角色与动物仅用于本地作者锁定互动，不触发模型续写。",
+          "synopsis": "萌宠厨房第一视角互动，喂食之后，小厨师又提出了新的菜单。",
+          "openThreads": [
+            "小厨师把空碗推回你面前，又用爪子指了指冰箱——看来下一道菜该由你决定。"
+          ],
+          "relationships": [],
+          "nextHook": "视频结束后，由玩家选择下一步。"
+        }
+      }
+    ],
+    "characters": [],
+    "storyState": {
+      "logline": "小厨师把空碗推回你面前，又用爪子指了指冰箱——看来下一道菜该由你决定。",
+      "genreTags": "世界模型 / 第一视角 / 互动视频 / 作者锁定",
+      "protagonist": "你以第一人称进入一段世界模型生成的影像，并在结尾决定故事下一步。",
+      "castNotes": "演示角色与动物仅用于本地作者锁定互动，不触发模型续写。",
+      "synopsis": "萌宠厨房第一视角互动，喂食之后，小厨师又提出了新的菜单。",
+      "openThreads": [
+        "小厨师把空碗推回你面前，又用爪子指了指冰箱——看来下一道菜该由你决定。"
+      ],
+      "relationships": [],
+      "nextHook": "视频结束后，由玩家选择下一步。"
+    },
+    "orientation": "landscape",
+    "language": "zh-CN",
+    "cacheIdentity": {
+      "visibility": "public",
+      "storyId": "case:world-model-little-chef",
+      "templateId": "world-model-little-chef",
+      "version": "world-model-demo-v1"
+    },
+    "authoredStory": {
+      "caseStudyId": "world-model-little-chef",
+      "version": "author-locked-world-model-demo-v1",
+      "authorLocked": true,
+      "releasePolicy": {
+        "defaultAccess": "public",
+        "restrictedNodeIds": []
+      },
+      "currentNodeId": "world-model-little-chef:start",
+      "currentBeatId": "world-model-little-chef:after-video",
+      "visitedNodeIds": [
+        "world-model-little-chef:start"
+      ],
+      "variables": {},
+      "variableDefinitions": [],
+      "nodes": [
+        {
+          "nodeId": "world-model-little-chef:start",
+          "sourceSceneId": "world-model-little-chef-video",
+          "title": "今天由小厨师掌勺",
+          "kind": "video",
+          "episodeId": "world-model-demo",
+          "sourceParagraphIds": [
+            "world-model-little-chef:video"
+          ],
+          "releasePolicy": "public",
+          "scene": {
+            "id": "world-model-little-chef:video",
+            "scenePrompt": "世界模型第一视角互动演示：今天由小厨师掌勺",
+            "entryBeatId": "world-model-little-chef:after-video",
+            "sceneKey": "world-model-little-chef",
+            "imageUrl": "/case-studies/world-model-little-chef/assets/poster.jpg",
+            "orientation": "landscape",
+            "media": {
+              "kind": "video",
+              "url": "/api/video-assets/world-model-demos/world-model-little-chef/content",
+              "posterUrl": "/case-studies/world-model-little-chef/assets/poster.jpg",
+              "durationMs": 54010,
+              "hasAudio": true,
+              "endBehavior": "unlock-interaction",
+              "allowSkip": true,
+              "hotspotsEnabled": false
+            },
+            "beats": [
+              {
+                "id": "world-model-little-chef:after-video",
+                "narration": "小厨师把空碗推回你面前，又用爪子指了指冰箱——看来下一道菜该由你决定。",
+                "next": {
+                  "type": "choice",
+                  "choices": [
+                    {
+                      "id": "world-model-little-chef:apple-dessert:choice",
+                      "label": "【选项】做一份苹果点心",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "author-locked:world-model-little-chef:apple-dessert",
+                        "authoredTargetNodeId": "world-model-little-chef:apple-dessert"
+                      }
+                    },
+                    {
+                      "id": "world-model-little-chef:buy-ingredients:choice",
+                      "label": "【选项】带它去采购食材",
+                      "effect": {
+                        "kind": "change-scene",
+                        "nextSceneSeed": "author-locked:world-model-little-chef:buy-ingredients",
+                        "authoredTargetNodeId": "world-model-little-chef:buy-ingredients"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "nodeId": "world-model-little-chef:apple-dessert",
+          "sourceSceneId": "apple-dessert-ending",
+          "title": "做一份苹果点心",
+          "kind": "ending",
+          "episodeId": "world-model-demo",
+          "sourceParagraphIds": [
+            "world-model-little-chef:apple-dessert"
+          ],
+          "releasePolicy": "public",
+          "scene": {
+            "id": "world-model-little-chef:apple-dessert:scene",
+            "scenePrompt": "世界模型互动演示结尾：做一份苹果点心",
+            "entryBeatId": "world-model-little-chef:apple-dessert:beat",
+            "sceneKey": "world-model-little-chef-ending",
+            "imageUrl": "/case-studies/world-model-little-chef/assets/poster.jpg",
+            "orientation": "landscape",
+            "media": {
+              "kind": "image",
+              "url": "/case-studies/world-model-little-chef/assets/poster.jpg"
+            },
+            "beats": [
+              {
+                "id": "world-model-little-chef:apple-dessert:beat",
+                "narration": "你切好苹果，小厨师认真守在烤箱前。香味飘出来时，它得意地拍了拍围裙。",
+                "next": {
+                  "type": "choice",
+                  "choices": []
+                }
+              }
+            ]
+          }
+        },
+        {
+          "nodeId": "world-model-little-chef:buy-ingredients",
+          "sourceSceneId": "buy-ingredients-ending",
+          "title": "带它去采购食材",
+          "kind": "ending",
+          "episodeId": "world-model-demo",
+          "sourceParagraphIds": [
+            "world-model-little-chef:buy-ingredients"
+          ],
+          "releasePolicy": "public",
+          "scene": {
+            "id": "world-model-little-chef:buy-ingredients:scene",
+            "scenePrompt": "世界模型互动演示结尾：带它去采购食材",
+            "entryBeatId": "world-model-little-chef:buy-ingredients:beat",
+            "sceneKey": "world-model-little-chef-ending",
+            "imageUrl": "/case-studies/world-model-little-chef/assets/poster.jpg",
+            "orientation": "landscape",
+            "media": {
+              "kind": "image",
+              "url": "/case-studies/world-model-little-chef/assets/poster.jpg"
+            },
+            "beats": [
+              {
+                "id": "world-model-little-chef:buy-ingredients:beat",
+                "narration": "你拿起购物袋，它立刻跳下椅子跑到门口。今天的厨房冒险才刚刚开始。",
+                "next": {
+                  "type": "choice",
+                  "choices": []
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "assetSummary": {
+    "generated": 2,
+    "pending": 0,
+    "failed": 0
+  }
+}

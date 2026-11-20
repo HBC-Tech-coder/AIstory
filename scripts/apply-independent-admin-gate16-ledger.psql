@@ -1,0 +1,322 @@
+\set ON_ERROR_STOP on
+
+-- Package-owned Gate16 apply envelope. This is intentionally a psql entrypoint,
+-- not a Supabase migration. It binds the immutable Gate16 DDL and the exact
+-- production migration-ledger shape in one database-owner transaction.
+begin;
+
+set local check_function_bodies = on;
+set local plpgsql.extra_warnings = 'all';
+set local plpgsql.extra_errors = 'shadowed_variables';
+set local search_path = pg_catalog;
+
+select pg_catalog.pg_advisory_xact_lock(20260829, 63000);
+
+do $aistory_gate16_ledger_preflight$
+declare
+  v_database_owner text;
+  v_ledger_oid oid;
+  v_relation_owner text;
+  v_column_count integer;
+  v_constraint_count integer;
+  v_gate15_count integer;
+  v_gate16_count integer;
+  v_domain_gate_count integer;
+begin
+  select pg_catalog.pg_get_userbyid(database_row.datdba)
+  into strict v_database_owner
+  from pg_catalog.pg_database as database_row
+  where database_row.datname = pg_catalog.current_database();
+
+  if v_database_owner is distinct from 'postgres'
+    or session_user is distinct from v_database_owner
+    or current_user is distinct from v_database_owner then
+    raise exception using
+      errcode = '55000',
+      message = 'Gate16 ledger database-owner posture unavailable';
+  end if;
+
+  v_ledger_oid :=
+    pg_catalog.to_regclass('supabase_migrations.schema_migrations');
+  if v_ledger_oid is null then
+    raise exception using
+      errcode = '55000',
+      message = 'Gate16 exact migration ledger unavailable';
+  end if;
+
+  select pg_catalog.pg_get_userbyid(relation_row.relowner)
+  into strict v_relation_owner
+  from pg_catalog.pg_class as relation_row
+  join pg_catalog.pg_namespace as namespace_row
+    on namespace_row.oid = relation_row.relnamespace
+  where relation_row.oid = v_ledger_oid
+    and namespace_row.nspname = 'supabase_migrations'
+    and relation_row.relname = 'schema_migrations'
+    and relation_row.relkind = 'r'
+    and relation_row.relpersistence = 'p';
+
+  if v_relation_owner is distinct from 'postgres' then
+    raise exception using
+      errcode = '55000',
+      message = 'Gate16 exact migration ledger owner unavailable';
+  end if;
+
+  select pg_catalog.count(*) into v_column_count
+  from pg_catalog.pg_attribute as attribute_row
+  where attribute_row.attrelid = v_ledger_oid
+    and attribute_row.attnum > 0
+    and not attribute_row.attisdropped;
+
+  if v_column_count <> 4
+    or not exists (
+      select 1
+      from pg_catalog.pg_attribute as attribute_row
+      left join pg_catalog.pg_attrdef as default_row
+        on default_row.adrelid = attribute_row.attrelid
+       and default_row.adnum = attribute_row.attnum
+      where attribute_row.attrelid = v_ledger_oid
+        and attribute_row.attnum = 1
+        and attribute_row.attname = 'version'
+        and pg_catalog.format_type(
+          attribute_row.atttypid,
+          attribute_row.atttypmod
+        ) = 'text'
+        and attribute_row.attnotnull
+        and attribute_row.attidentity = ''
+        and attribute_row.attgenerated = ''
+        and default_row.oid is null
+    )
+    or not exists (
+      select 1
+      from pg_catalog.pg_attribute as attribute_row
+      left join pg_catalog.pg_attrdef as default_row
+        on default_row.adrelid = attribute_row.attrelid
+       and default_row.adnum = attribute_row.attnum
+      where attribute_row.attrelid = v_ledger_oid
+        and attribute_row.attnum = 2
+        and attribute_row.attname = 'name'
+        and pg_catalog.format_type(
+          attribute_row.atttypid,
+          attribute_row.atttypmod
+        ) = 'text'
+        and attribute_row.attnotnull
+        and attribute_row.attidentity = ''
+        and attribute_row.attgenerated = ''
+        and default_row.oid is null
+    )
+    or not exists (
+      select 1
+      from pg_catalog.pg_attribute as attribute_row
+      left join pg_catalog.pg_attrdef as default_row
+        on default_row.adrelid = attribute_row.attrelid
+       and default_row.adnum = attribute_row.attnum
+      where attribute_row.attrelid = v_ledger_oid
+        and attribute_row.attnum = 3
+        and attribute_row.attname = 'sha256'
+        and pg_catalog.format_type(
+          attribute_row.atttypid,
+          attribute_row.atttypmod
+        ) = 'text'
+        and attribute_row.attnotnull
+        and attribute_row.attidentity = ''
+        and attribute_row.attgenerated = ''
+        and default_row.oid is null
+    )
+    or not exists (
+      select 1
+      from pg_catalog.pg_attribute as attribute_row
+      join pg_catalog.pg_attrdef as default_row
+        on default_row.adrelid = attribute_row.attrelid
+       and default_row.adnum = attribute_row.attnum
+      where attribute_row.attrelid = v_ledger_oid
+        and attribute_row.attnum = 4
+        and attribute_row.attname = 'applied_at'
+        and pg_catalog.format_type(
+          attribute_row.atttypid,
+          attribute_row.atttypmod
+        ) = 'timestamp with time zone'
+        and attribute_row.attnotnull
+        and attribute_row.attidentity = ''
+        and attribute_row.attgenerated = ''
+        and pg_catalog.pg_get_expr(
+          default_row.adbin,
+          default_row.adrelid
+        ) = 'now()'
+    ) then
+    raise exception using
+      errcode = '55000',
+      message = 'Gate16 exact migration ledger columns unavailable';
+  end if;
+
+  select pg_catalog.count(*) into v_constraint_count
+  from pg_catalog.pg_constraint as constraint_row
+  where constraint_row.conrelid = v_ledger_oid;
+
+  if v_constraint_count <> 1
+    or not exists (
+      select 1
+      from pg_catalog.pg_constraint as constraint_row
+      where constraint_row.conrelid = v_ledger_oid
+        and constraint_row.contype = 'p'
+        and constraint_row.conkey = array[1]::smallint[]
+        and constraint_row.convalidated
+        and not constraint_row.condeferrable
+        and not constraint_row.condeferred
+    )
+    or exists (
+      select 1
+      from pg_catalog.pg_trigger as trigger_row
+      where trigger_row.tgrelid = v_ledger_oid
+        and not trigger_row.tgisinternal
+    )
+    or exists (
+      select 1
+      from pg_catalog.pg_rewrite as rewrite_row
+      where rewrite_row.ev_class = v_ledger_oid
+    ) then
+    raise exception using
+      errcode = '55000',
+      message = 'Gate16 exact migration ledger constraints unavailable';
+  end if;
+
+  perform 1
+  from supabase_migrations.schema_migrations as ledger_row
+  where ledger_row.version = '20260828233000'
+  for update;
+  get diagnostics v_gate15_count = row_count;
+
+  if v_gate15_count <> 1 then
+    raise exception using
+      errcode = '55000',
+      message = 'Gate16 migration ledger predecessor unavailable';
+  end if;
+
+  select pg_catalog.count(*) into v_gate15_count
+  from supabase_migrations.schema_migrations as ledger_row
+  where ledger_row.version = '20260828233000'
+    and ledger_row.name collate "C" =
+      '20260828233000_independent_admin_principal_pg16_gate.sql' collate "C"
+    and ledger_row.sha256 collate "C" =
+      '29c23ec6ef72ae04a9037d5c191ccc2b9d0e7fee614284f26a611bb4c4ef2b97'
+        collate "C"
+    and ledger_row.applied_at is not null;
+  execute format(
+    'select count(*) from %s where version = $1',
+    v_ledger_oid::regclass
+  ) into v_gate16_count using '20260829063000';
+
+  if v_gate15_count <> 1 or v_gate16_count <> 0 then
+    raise exception using
+      errcode = '55000',
+      message = 'Gate16 migration ledger predecessor unavailable';
+  end if;
+
+  if pg_catalog.to_regclass('public.aistory_schema_gates') is null
+    or pg_catalog.to_regclass(
+      'public.independent_admin_qualification_resolutions'
+    ) is not null then
+    raise exception using
+      errcode = '55000',
+      message = 'Gate16 domain prerequisite unavailable';
+  end if;
+
+  select pg_catalog.count(*) into v_domain_gate_count
+  from public.aistory_schema_gates as gate_row
+  where gate_row.gate_name = 'independent_admin_principal'
+    and gate_row.version = '20260828233000';
+  if v_domain_gate_count <> 1 then
+    raise exception using
+      errcode = '55000',
+      message = 'Gate16 domain predecessor unavailable';
+  end if;
+end;
+$aistory_gate16_ledger_preflight$;
+
+\ir ../supabase/migrations/20260829063000_independent_admin_qualification_residue_retirement_gate.sql
+
+do $aistory_gate16_ledger_append$
+declare
+  v_inserted integer;
+begin
+  insert into supabase_migrations.schema_migrations (
+    version,
+    name,
+    sha256
+  ) values (
+    '20260829063000',
+    '20260829063000_independent_admin_qualification_residue_retirement_gate.sql',
+    '4c958ca8af443e97f254fef1cfb1c2e6ea48f1907466d1b1c2ebc2282f598644'
+  );
+  get diagnostics v_inserted = row_count;
+  if v_inserted <> 1 then
+    raise exception using
+      errcode = '55000',
+      message = 'Gate16 migration ledger append unavailable';
+  end if;
+end;
+$aistory_gate16_ledger_append$;
+
+do $aistory_gate16_ledger_postflight$
+declare
+  v_gate15_count integer;
+  v_gate16_count integer;
+  v_resolution_count integer;
+  v_resolution_state text;
+  v_domain_gate text;
+begin
+  select
+    pg_catalog.count(*) filter (
+      where ledger_row.version = '20260828233000'
+        and ledger_row.name collate "C" =
+          '20260828233000_independent_admin_principal_pg16_gate.sql' collate "C"
+        and ledger_row.sha256 collate "C" =
+          '29c23ec6ef72ae04a9037d5c191ccc2b9d0e7fee614284f26a611bb4c4ef2b97'
+            collate "C"
+        and ledger_row.applied_at is not null
+    ),
+    pg_catalog.count(*) filter (
+      where ledger_row.version = '20260829063000'
+        and ledger_row.name collate "C" =
+          '20260829063000_independent_admin_qualification_residue_retirement_gate.sql'
+            collate "C"
+        and ledger_row.sha256 collate "C" =
+          '4c958ca8af443e97f254fef1cfb1c2e6ea48f1907466d1b1c2ebc2282f598644'
+            collate "C"
+        and ledger_row.applied_at is not null
+    )
+  into v_gate15_count, v_gate16_count
+  from supabase_migrations.schema_migrations as ledger_row
+  where ledger_row.version in ('20260828233000', '20260829063000');
+
+  select pg_catalog.count(*), pg_catalog.min(resolution_row.state)
+  into v_resolution_count, v_resolution_state
+  from public.independent_admin_qualification_resolutions as resolution_row;
+
+  select gate_row.version into v_domain_gate
+  from public.aistory_schema_gates as gate_row
+  where gate_row.gate_name = 'independent_admin_principal';
+
+  if v_gate15_count <> 1
+    or v_gate16_count <> 1
+    or v_resolution_count <> 1
+    or v_resolution_state not in ('awaiting_attestation', 'not_required')
+    or (
+      v_resolution_state = 'awaiting_attestation'
+      and v_domain_gate is distinct from '20260828233000'
+    )
+    or (
+      v_resolution_state = 'not_required'
+      and v_domain_gate is distinct from '20260829063000'
+    )
+    or public.aistory_independent_admin_security_posture()
+      is distinct from true then
+    raise exception using
+      errcode = '55000',
+      message = 'Gate16 atomic ledger/domain postflight unavailable';
+  end if;
+end;
+$aistory_gate16_ledger_postflight$;
+
+commit;
+
+\echo PASS_GATE16_ATOMIC_LEDGER_APPLY

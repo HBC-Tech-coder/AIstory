@@ -19,9 +19,9 @@ import {
 } from "../lib/admin/service";
 import {
   createLocalAdminToken,
-  isLoopbackHost,
   verifyLocalAdminToken,
 } from "../lib/admin/security";
+import { isLoopbackHost } from "../lib/security/host";
 import type {
   AdminActor,
   GameplayEvent,

@@ -3,6 +3,7 @@ import "server-only";
 import { createHash, randomInt, randomUUID } from "node:crypto";
 
 import {
+  ComfyUIWorkflowSelectionUnavailableError,
   getComfyUIProviderConfig,
   queueRegisteredComfyUIWorkflow,
 } from "@/lib/providers/comfyui/server";
@@ -27,6 +28,10 @@ import {
   saveStoredGenerationJob,
   updateStoredGenerationJob,
 } from "./store";
+import {
+  releaseGpuExecution,
+  tryAcquireGpuExecution,
+} from "./executionGate";
 import type {
   ComfyUIGenerationJobInput,
   GenerationJob,
@@ -46,9 +51,39 @@ type SchedulerOptions = {
 };
 
 function safeJob(job: StoredGenerationJob): GenerationJob {
-  const publicJob: GenerationJob & { input?: unknown } = { ...job };
+  const publicJob: GenerationJob & {
+    input?: unknown;
+    workflowFingerprint?: unknown;
+  } = { ...job };
   delete publicJob.input;
+  delete publicJob.workflowFingerprint;
   return publicJob;
+}
+
+function pinnedComfyUIWorkflowSelection(
+  job: StoredGenerationJob,
+): { id: string; version: number; fingerprint: string } | undefined {
+  if (job.provider !== "comfyui") return undefined;
+  const inputWorkflowId = (job.input as { workflowId?: unknown } | undefined)
+    ?.workflowId;
+  if (
+    typeof inputWorkflowId !== "string" ||
+    typeof job.workflowId !== "string" ||
+    inputWorkflowId !== job.workflowId ||
+    !/^[a-z0-9][a-z0-9_-]{2,63}$/.test(job.workflowId) ||
+    typeof job.workflowVersion !== "number" ||
+    !Number.isSafeInteger(job.workflowVersion) ||
+    job.workflowVersion <= 0 ||
+    typeof job.workflowFingerprint !== "string" ||
+    !/^[a-f0-9]{64}$/.test(job.workflowFingerprint)
+  ) {
+    return undefined;
+  }
+  return {
+    id: job.workflowId,
+    version: job.workflowVersion,
+    fingerprint: job.workflowFingerprint,
+  };
 }
 
 export function generationRequestFingerprint(
@@ -140,6 +175,9 @@ function delay(ms: number) {
 }
 
 function safeErrorCode(error: unknown): string {
+  if (error instanceof ComfyUIWorkflowSelectionUnavailableError) {
+    return "workflow_selection_unavailable";
+  }
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("HTTP 429")) return "provider_rate_limited";
   if (message.includes("HTTP 5")) return "provider_unavailable";
@@ -208,13 +246,18 @@ export class GenerationJobScheduler {
 
   async list(): Promise<GenerationJob[]> {
     await this.initialize();
-    return (await listStoredGenerationJobs()).slice(0, 100).map(safeJob);
+    return (await listStoredGenerationJobs())
+      .filter((job) => job.provider !== "gpu-connector-lan")
+      .slice(0, 100)
+      .map(safeJob);
   }
 
   async get(id: string): Promise<GenerationJob | undefined> {
     await this.initialize();
     const job = await getStoredGenerationJob(id);
-    return job ? safeJob(job) : undefined;
+    return job && job.provider !== "gpu-connector-lan"
+      ? safeJob(job)
+      : undefined;
   }
 
   async submitComfyUI(input: ComfyUIGenerationJobInput): Promise<GenerationJob> {
@@ -278,6 +321,7 @@ export class GenerationJobScheduler {
         idempotencyKey: input.idempotencyKey,
         workflowId: registered.template.id,
         workflowVersion: registered.version.version,
+        workflowFingerprint: registered.version.fingerprint,
         attempts: 0,
         maxAttempts: 2,
         retryable: false,
@@ -391,6 +435,9 @@ export class GenerationJobScheduler {
     await this.initialize();
     const job = await getStoredGenerationJob(id);
     if (!job) throw new Error("Generation job not found.");
+    if (job.provider === "gpu-connector-lan") {
+      throw new Error("LAN GPU jobs require the administrator coordinator.");
+    }
     if (job.status === "queued") {
       return safeJob(
         await updateStoredGenerationJob(id, (item) => {
@@ -442,10 +489,14 @@ export class GenerationJobScheduler {
     const job = await getStoredGenerationJob(id);
     if (
       !job ||
+      job.provider === "gpu-connector-lan" ||
       !["failed", "cancelled", "interrupted"].includes(job.status) ||
       !job.retryable ||
       job.attempts >= job.maxAttempts
     ) {
+      throw new Error("Generation job is not retryable.");
+    }
+    if (job.provider === "comfyui" && !pinnedComfyUIWorkflowSelection(job)) {
       throw new Error("Generation job is not retryable.");
     }
     const updated = await updateStoredGenerationJob(id, (item) => {
@@ -470,7 +521,8 @@ export class GenerationJobScheduler {
       this.currentPromptId = undefined;
       this.processing = false;
       const queued = (await listStoredGenerationJobs()).some(
-        (job) => job.status === "queued",
+        (job) =>
+          job.status === "queued" && job.provider !== "gpu-connector-lan",
       );
       if (queued) this.kick();
     });
@@ -479,7 +531,10 @@ export class GenerationJobScheduler {
   private async processQueue(): Promise<void> {
     while (true) {
       const next = (await listStoredGenerationJobs())
-        .filter((job) => job.status === "queued")
+        .filter(
+          (job) =>
+            job.status === "queued" && job.provider !== "gpu-connector-lan",
+        )
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
       if (!next) return;
       await this.process(next);
@@ -487,6 +542,8 @@ export class GenerationJobScheduler {
   }
 
   private async process(job: StoredGenerationJob): Promise<void> {
+    if (job.provider === "gpu-connector-lan") return;
+    if (!tryAcquireGpuExecution({ kind: "local", jobId: job.id })) return;
     this.currentJobId = job.id;
     await updateStoredGenerationJob(job.id, (item) => {
       item.status = "running";
@@ -508,8 +565,10 @@ export class GenerationJobScheduler {
         await this.processLocalMiniDrama(job);
         return;
       }
+      const selection = pinnedComfyUIWorkflowSelection(job);
+      if (!selection) throw new ComfyUIWorkflowSelectionUnavailableError();
       const queued = await queueRegisteredComfyUIWorkflow(
-        job.input.workflowId,
+        selection,
         { ...job.input, purpose: "foreground" },
         this.fetcher,
       );
@@ -534,13 +593,9 @@ export class GenerationJobScheduler {
         item.status = "pending";
         item.progress = 10;
         item.providerTaskId = queued.promptId;
-        item.workflowVersion = queued.workflowVersion;
       });
 
-      const registered = await getComfyUIWorkflowTemplate(job.input.workflowId);
-      const outputNodes = new Set(
-        registered?.version.workflow.outputNodeIds ?? [],
-      );
+      const outputNodes = new Set(queued.outputNodeIds);
       for (let poll = 0; poll < this.maxPolls; poll += 1) {
         const current = await getStoredGenerationJob(job.id);
         if (current?.status === "cancelled") return;
@@ -596,12 +651,15 @@ export class GenerationJobScheduler {
         item.errorMessage = item.provider === "localminidrama" && item.providerTaskId
           ? `LocalMiniDrama provider task ${item.providerTaskId} failed (${item.errorCode}).`
           : undefined;
-        item.retryable = item.attempts < item.maxAttempts;
+        item.retryable =
+          !(error instanceof ComfyUIWorkflowSelectionUnavailableError) &&
+          item.attempts < item.maxAttempts;
         item.completedAt = new Date().toISOString();
       });
     } finally {
       this.currentJobId = undefined;
       this.currentPromptId = undefined;
+      releaseGpuExecution({ kind: "local", jobId: job.id });
     }
   }
 

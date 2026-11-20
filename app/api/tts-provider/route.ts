@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { loadEngineConfig } from "@/lib/config";
 import { authorizeCredentialAccess } from "@/lib/credentials/serverPolicy";
 import { requireUser } from "@/lib/supabase/guard";
+import { resolveLinkedPhoneForBilling } from "@/lib/billing/linkedBillingServer";
+import type { AiUserLinkedBillingPhoneUserId } from "@/lib/auth/aiUserLinkedBillingRepository";
 
 export const runtime = "nodejs";
 
@@ -15,13 +17,25 @@ export const runtime = "nodejs";
 // the provider (a server-config fact, not user data) isn't leaked publicly.
 // BYO client TTS (clientTts:true) takes precedence and bypasses this signal.
 export async function GET() {
-  const auth = await requireUser();
+  const auth = await requireUser({ allowAnonymousWhenAuthDisabled: true });
   if (auth instanceof NextResponse) return auth;
 
+  let verifiedLinkedPhoneUserId: AiUserLinkedBillingPhoneUserId | undefined;
+  if (auth.authType === "aiuser") {
+    try {
+      const linked = await resolveLinkedPhoneForBilling(auth.aiuser);
+      if (linked.state === "linked") verifiedLinkedPhoneUserId = linked.phoneUserId;
+    } catch {
+      return NextResponse.json({ provider: null, credentialMode: "user_byok" },
+        { headers: { "Cache-Control": "no-store" } });
+    }
+  }
   const credentialAccess = authorizeCredentialAccess({
     requestedMode: "platform_managed",
     hasByok: false,
     userId: auth.userId,
+    authType: auth.authType,
+    verifiedLinkedPhoneUserId,
   });
   if (!credentialAccess.allowed) {
     return NextResponse.json(
