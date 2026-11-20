@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "virtual-girlfriend-20260727",
+      "gender": "男性向",
+      "index": 0,
+      "title": "她不在出厂设定里",
+      "outline": "从原稿逐段锁定的机器人女友互动日记",
+      "style": "近未来写实电影感，国内可公开内测版本，16:9 横屏为主，银灰与晨光暖白为主色，轻度科技感公寓、柔和镜面、低饱和霓虹界面、真实镜头语言。",
+      "tags": [
+        "近未来恋爱悬疑",
+        "互动影游",
+        "机器人伦理"
+      ],
+      "coverPath": "/case-studies/virtual-girlfriend-20260727/assets/vg11-cover.png",
+      "playPath": "/play?case=virtual-girlfriend-20260727",
+      "assetStatus": "ready",
+      "active": true
+    }
+  ]
+}

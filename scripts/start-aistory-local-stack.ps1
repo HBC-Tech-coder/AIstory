@@ -16,20 +16,16 @@ $taskPathValue = [Environment]::GetEnvironmentVariable("Path", "Process")
 [Environment]::SetEnvironmentVariable("PATH", $null, "Process")
 [Environment]::SetEnvironmentVariable("Path", $taskPathValue, "Process")
 
-$aiStoryRoot = "D:\AIstory"
+$aiStoryRoot = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($LocalMiniDramaRoot)) {
   $bundledCore = Join-Path $aiStoryRoot "vendor\localminidrama"
-  $localMiniDramaRoot = if (Test-Path (Join-Path $bundledCore "backend-node\node_modules")) {
-    $bundledCore
-  } else {
-    "D:\AI-story\repos\localminidrama-1.2.9"
-  }
+  $localMiniDramaRoot = $bundledCore
 } else {
   $localMiniDramaRoot = [System.IO.Path]::GetFullPath($LocalMiniDramaRoot)
 }
 $localMiniDramaBackendRoot = Join-Path $localMiniDramaRoot "backend-node"
-$localMiniDramaLogs = "D:\AI-story\logs"
-$localMiniDramaPids = "D:\AI-story\pids"
+$localMiniDramaLogs = Join-Path $aiStoryRoot ".logs\localminidrama"
+$localMiniDramaPids = Join-Path $aiStoryRoot ".logs\pids"
 $aiStoryLogs = Join-Path $aiStoryRoot ".logs"
 $safeBackendLauncher = Join-Path $aiStoryRoot "scripts\localminidrama-safe-launch.cjs"
 $bindHost = if ($AllowLanBinding) { "0.0.0.0" } else { "127.0.0.1" }
@@ -50,8 +46,8 @@ $services = @(
     Name = "AIstory"
     Port = 4200
     Root = $aiStoryRoot
-    Command = "pnpm.cmd"
-    Arguments = @("exec", "next", "dev", "--hostname", $bindHost, "--port", "4200")
+    Command = "node.exe"
+    Arguments = @((Join-Path $aiStoryRoot "node_modules\next\dist\bin\next"), "dev", "--hostname", $bindHost, "--port", "4200")
     Stdout = Join-Path $aiStoryLogs "dev-4200.out.log"
     Stderr = Join-Path $aiStoryLogs "dev-4200.err.log"
     PidFile = Join-Path $aiStoryLogs "dev-4200.wrapper.pid"
@@ -80,12 +76,12 @@ $services = @(
     Name = "LocalMiniDrama frontend"
     Port = 4107
     Root = Join-Path $localMiniDramaRoot "frontweb"
-    Command = "npm.cmd"
-    Arguments = @("run", "dev", "--", "--host", $bindHost, "--port", "4107")
+    Command = "node.exe"
+    Arguments = @((Join-Path $localMiniDramaRoot "frontweb\node_modules\vite\bin\vite.js"), "--host", $bindHost, "--port", "4107", "--strictPort")
     Stdout = Join-Path $localMiniDramaLogs "localminidrama-frontweb-4107.out.log"
     Stderr = Join-Path $localMiniDramaLogs "localminidrama-frontweb-4107.err.log"
     PidFile = Join-Path $localMiniDramaPids "localminidrama-frontweb-4107.wrapper.pid"
-    HealthUrl = "http://127.0.0.1:4107/health"
+    HealthUrl = "http://127.0.0.1:4107/"
     ExpectedStatus = 200
     RequiredCommandLineFragments = @(
       (Join-Path $localMiniDramaRoot "frontweb"),
@@ -233,7 +229,7 @@ foreach ($service in $services) {
 
   $process = Start-Process `
     -FilePath $service.Command `
-    -ArgumentList $service.Arguments `
+    -ArgumentList ($service.Arguments | ForEach-Object { '"' + $_ + '"' }) `
     -WorkingDirectory $service.Root `
     -WindowStyle Hidden `
     -RedirectStandardOutput $service.Stdout `

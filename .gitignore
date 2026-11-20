@@ -45,9 +45,13 @@ pids
 /integration.patch
 /*.obj
 
-# Large generated demo videos stay in local/object storage; Git keeps their
-# manifests, posters, and story metadata only.
+# Only the five manifest-approved public demo videos ship with the test kit.
 /public/case-studies/*/assets/*.mp4
+!/public/case-studies/world-model-anime-sunset/assets/demo.mp4
+!/public/case-studies/world-model-close-encounter/assets/demo.mp4
+!/public/case-studies/world-model-forest-friend/assets/demo.mp4
+!/public/case-studies/world-model-little-chef/assets/demo.mp4
+!/public/case-studies/world-model-midnight-heartbeat/assets/demo.mp4
 
 # Guard against accidental recursive workspace copies.
 /app/app/
@@ -101,7 +105,9 @@ users.md
 
 # Local source material, review renders, and generated delivery packages stay
 # off GitHub. Runtime-safe derived case assets live under public/case-studies.
-/content/
+/content/*
+!/content/case-studies.catalog.json
+!/content/featured-stories.manifest.json
 /Downloads/
 /docs
 /experiments/

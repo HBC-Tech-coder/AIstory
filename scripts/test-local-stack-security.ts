@@ -60,8 +60,7 @@ interface SafeLauncher {
 
 const require = createRequire(import.meta.url);
 const projectRoot = resolve(import.meta.dirname, "..");
-const donorBackendRoot =
-  "D:\\AI-story\\repos\\localminidrama\\backend-node";
+const donorBackendRoot = join(projectRoot, "vendor", "localminidrama", "backend-node");
 const safeLauncher = require(
   join(projectRoot, "scripts", "localminidrama-safe-launch.cjs"),
 ) as SafeLauncher;
@@ -266,7 +265,7 @@ assert.match(
   stackScript,
   /4200\/studio"; ExpectedStatus = 200/,
 );
-assert.match(stackScript, /4107\/health/);
+assert.match(stackScript, /4107\//);
 assert.match(stackScript, /LocalAddress/);
 assert.match(stackScript, /RequiredCommandLineFragments/);
 assert.match(stackScript, /Get-CimInstance/);
