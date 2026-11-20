@@ -4,6 +4,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 
 const LOOPBACK_HOST = "127.0.0.1";
 const LAN_HOST = "0.0.0.0";
@@ -209,7 +210,7 @@ function preflightResumableTasks(options, config, Database) {
   }
 }
 
-function launch(argv = process.argv.slice(2)) {
+async function launch(argv = process.argv.slice(2)) {
   const options = parseLaunchArgs(argv);
   const host = resolveBindHost(options);
   const configModulePath = path.join(
@@ -237,8 +238,11 @@ function launch(argv = process.argv.slice(2)) {
   const Database = require(databaseModulePath);
   preflightResumableTasks(options, baseConfig, Database);
 
-  configModule.loadConfig = () =>
-    applySafeRuntimeConfig(originalLoadConfig(), options);
+  const runtimeVersion = JSON.parse(fs.readFileSync(path.join(options.backendRoot, "package.json"), "utf8")).version;
+  configModule.loadConfig = () => {
+    const config = applySafeRuntimeConfig(originalLoadConfig(), options);
+    return { ...config, app: { ...config.app, version: runtimeVersion } };
+  };
 
   // Never inherit the donor's process-wide insecure TLS setting. The AIstory
   // launcher has no insecure-TLS mode because the donor runtime can call real
@@ -263,7 +267,17 @@ function launch(argv = process.argv.slice(2)) {
   const logger = require(
     path.join(options.backendRoot, "src", "logger.js"),
   );
-  const { app, db } = appModule.createApp();
+  const { app, db, config } = appModule.createApp();
+  const agentPath = path.join(options.backendRoot, "src", "mastra", "index.mjs");
+  if (fs.existsSync(agentPath)) {
+    const { initAgent, isAgentReady } = await import(pathToFileURL(agentPath).href);
+    await initAgent({ db, log: logger, config,
+      dataDir: path.dirname(resolveDatabasePath(options.backendRoot, config.database)) });
+    if (!isAgentReady()) {
+      dbModule.closeDb();
+      throw new LocalMiniDramaSafeStartError("LocalMiniDrama 1.2.9 assistant initialization failed.");
+    }
+  }
   // Recheck after migrations/app initialization and immediately before the
   // listener exists. The patched donor hook cannot schedule provider polling.
   assertNoResumableTasksInDatabase(db);
@@ -289,16 +303,14 @@ function launch(argv = process.argv.slice(2)) {
 }
 
 if (require.main === module) {
-  try {
-    launch();
-  } catch (error) {
+  launch().catch((error) => {
     const safeMessage =
       error instanceof LocalMiniDramaSafeStartError
         ? error.message
         : "LocalMiniDrama safe start failed before listening.";
     console.error(`[safe-start] ${safeMessage}`);
     process.exitCode = 1;
-  }
+  });
 }
 
 module.exports = {

@@ -2,6 +2,7 @@
 param(
   [switch]$StatusOnly,
   [switch]$AllowLanBinding,
+  [string]$LocalMiniDramaRoot = "",
   [ValidateRange(1, 120)]
   [int]$WaitSeconds = 30
 )
@@ -16,7 +17,16 @@ $taskPathValue = [Environment]::GetEnvironmentVariable("Path", "Process")
 [Environment]::SetEnvironmentVariable("Path", $taskPathValue, "Process")
 
 $aiStoryRoot = "D:\AIstory"
-$localMiniDramaRoot = "D:\AI-story\repos\localminidrama"
+if ([string]::IsNullOrWhiteSpace($LocalMiniDramaRoot)) {
+  $bundledCore = Join-Path $aiStoryRoot "vendor\localminidrama"
+  $localMiniDramaRoot = if (Test-Path (Join-Path $bundledCore "backend-node\node_modules")) {
+    $bundledCore
+  } else {
+    "D:\AI-story\repos\localminidrama-1.2.9"
+  }
+} else {
+  $localMiniDramaRoot = [System.IO.Path]::GetFullPath($LocalMiniDramaRoot)
+}
 $localMiniDramaBackendRoot = Join-Path $localMiniDramaRoot "backend-node"
 $localMiniDramaLogs = "D:\AI-story\logs"
 $localMiniDramaPids = "D:\AI-story\pids"

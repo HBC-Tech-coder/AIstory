@@ -54,6 +54,17 @@ pids
 /components/components/
 /lib/lib/
 
+# Vendored LocalMiniDrama source only; provider configuration and runtime
+# databases must never enter the source snapshot.
+/vendor/localminidrama/**/data/
+/vendor/localminidrama/**/storage/
+/vendor/localminidrama/**/configs/ai-configs*.json
+/vendor/localminidrama/**/*.db*
+/vendor/localminidrama/**/*.sqlite*
+/vendor/localminidrama/**/.env*
+/vendor/localminidrama/**/*.pem
+/vendor/localminidrama/**/*.key
+
 .open-next
 .wrangler
 .opendeploy
